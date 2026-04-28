@@ -1,0 +1,42 @@
+<button @click="menuOpen=!menuOpen">menu</button>
+<ul id="object-menu" v-if="menuOpen">
+    <li id="add-to-folder" v-if="objectChannel">
+        <button
+            type="button"
+            class="add-to-folder-menu__toggle"
+            @click="toggleMenu"
+            :aria-expanded="addMenuOpen"
+        >
+            Add to folder
+        </button>
+        <div
+            v-show="addMenuOpen"
+            class="add-to-folder-menu__dropdown"
+            role="menu"
+        >
+            <p v-if="!targetFolders.length" class="add-to-folder-menu__empty">
+                No other folders yet
+            </p>
+            <ul v-else class="add-to-folder-menu__list">
+                <li v-for="folder of targetFolders" :key="folder.value.channel">
+                    <button
+                        type="button"
+                        role="menuitem"
+                        @click="addToFolder(folder.value.channel)"
+                    >
+                        {{ folder.value.title }}
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </li>
+    <li id="remove-from-menu" v-if="objectChannel && folderNavStack.length">
+        <button
+            type="button"
+            class="remove-from-folder-menu__toggle"
+            @click="removeFromFolder"
+        >
+            Remove from {{ parentFolderTitle }}
+        </button>
+    </li>
+</ul>

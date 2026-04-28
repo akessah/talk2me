@@ -1,0 +1,49 @@
+#new-object-sidebar h3 {
+  margin: 0.75rem 0 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+#new-object-sidebar h3:first-child {
+  margin-top: 0;
+}
+
+#new-object-sidebar form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+#new-object-sidebar form input[type="text"] {
+  flex: 1 1 140px;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 0.875rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+
+#new-object-sidebar form input[type="text"]::placeholder {
+  color: var(--text-muted);
+}
+
+#new-object-sidebar form input[type="text"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(91, 141, 239, 0.25);
+}
+
+#new-object-sidebar form button[type="submit"] {
+  flex-shrink: 0;
+}

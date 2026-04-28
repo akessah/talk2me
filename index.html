@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Talk2Me</title>
+        <script type="importmap">
+            {
+                "imports": {
+                    "vue": "https://cdn.jsdelivr.net/npm/vue@3.5.32/dist/vue.esm-browser.js",
+                    "vue-router": "https://cdn.jsdelivr.net/npm/vue-router@5.0.4/dist/vue-router.esm-browser.prod.js",
+                    "@graffiti-garden/implementation-local": "https://cdn.jsdelivr.net/npm/@graffiti-garden/implementation-local@1.2.0/dist/browser/index.js",
+                    "@graffiti-garden/implementation-decentralized": "https://cdn.jsdelivr.net/npm/@graffiti-garden/implementation-decentralized@0.0.9/dist/browser/index.js",
+                    "@graffiti-garden/wrapper-vue": "https://cdn.jsdelivr.net/npm/@graffiti-garden/wrapper-vue@1.2.2/dist/browser/plugin.mjs"
+                }
+            }
+        </script>
+        <link rel="stylesheet" href="./style.css" />
+        <link rel="stylesheet" href="./components/NewObjectSidebar/NewObjectSidebar.css" />
+        <link rel="stylesheet" href="./components/FolderSidebar/FolderSidebar.css" />
+        <link rel="stylesheet" href="./components/RootSidebar/RootSidebar.css" />
+        <link rel="stylesheet" href="./components/chat/Chat.css" />
+        <link rel="stylesheet" href="./components/home/home.css" />
+        <script src="./main.js" type="module"></script>
+    </head>
+    <body>
+        <div id="app">Loading...</div>
+        <template id="template">
+            <header>
+                <h1>Talk2Me</h1>
+            </header>
+
+            <main>
+                <button v-if="!$graffitiSession.value" @click="$graffiti.login()">
+                    Log In
+                </button>
+                <template v-else>
+                    <!-- Login header -->
+                    <p class="app-intro">Logged in as: <graffiti-actor-to-handle :actor="$graffitiSession.value?.actor"></graffiti-actor-to-handle></p>
+                    <button @click="$graffiti.logout($graffitiSession.value)">
+                        Log Out
+                    </button>
+
+                    <!-- <p>router!</p> -->
+                    <router-view
+                        :session="session"
+                        :graffiti="graffiti"
+                        :app-name="appName"
+                    >
+                    </router-view>
+                    <!-- <p>router!</p> -->
+                </template>
+
+            </main>
+        </template>
+    </body>
+</html>

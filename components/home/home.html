@@ -1,0 +1,56 @@
+
+
+    <!-- Sidebar -->
+     <!-- <p>home!</p> -->
+<div id="home">
+    <div id="sidebar">
+        <new-object-sidebar
+            :session="session"
+            :graffiti="graffiti"
+            :appName="appName"
+            :toggleNew="toggleNew"
+            v-if="newObject"
+        ></new-object-sidebar>
+
+
+        <folder-sidebar
+            :openChat="openChat"
+            :openChatChannel="openChatChannel"
+            :allObjects="allObjects"
+            :folderNavStack="folderNavStack"
+            :folderUpdates="folderUpdates"
+            :sidebarFolderChannel="sidebarFolderChannel"
+            :folderBack="folderBack"
+            v-else-if="sidebarFolderChannel"
+        ></folder-sidebar>
+
+        <root-sidebar
+            :allObjects="allObjects"
+            :openChatChannel="openChatChannel"
+            :openObjectFromRoot="openObjectFromRoot"
+            v-else
+        ></root-sidebar>
+        <button @click="toggleNew">{{newObject ? "Cancel" : "New"}}</button>
+    </div>
+
+
+
+
+    <!-- <p>chat!</p> -->
+    <chat
+        :folders="folders"
+        :openChatChannel="openChatChannel"
+        :session="session"
+        :graffiti="graffiti"
+        :appName="appName"
+        :folderNavStack="folderNavStack"
+        :allObjects="allObjects"
+        :openChat="openChat"
+        :folderBack="folderBack"
+        :folderUpdates="folderUpdates"
+
+    ></chat>
+
+</div>
+    <!-- Main window -->
+    <!-- <router-view></router-view> -->

@@ -1,0 +1,17 @@
+<ul id="folder-sidebar">
+    <h2>{{ sidebarListTitle || openChat?.value?.title }}</h2>
+    <button
+        type="button"
+        class="sidebar-back"
+        @click="folderBack"
+    >
+        ← Back
+    </button>
+    <li v-for="obj of openFolder" :key="obj.value.channel">
+        <button type="button" @click="openObjectFromFolder(obj)">
+            <!-- <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
+            <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else> -->
+            {{obj.value.title}}
+        </button>
+    </li>
+</ul>

@@ -1,0 +1,61 @@
+ul#folder-sidebar {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+ul#folder-sidebar h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0.35rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+  position: static;
+  background: none;
+}
+
+ul#folder-sidebar li {
+  margin: 0;
+}
+
+ul#folder-sidebar button {
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+
+ul#folder-sidebar button:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+img{
+    max-width: 1.25rem;
+    max-height: 1.25rem;
+    object-fit: contain;
+    vertical-align: middle;
+    margin-right: 0.5rem;
+}
+
+.sidebar-back {
+  width: 100%;
+  text-align: left;
+  padding: 0.6rem 0.85rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.sidebar-back:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}

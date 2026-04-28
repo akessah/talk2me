@@ -1,0 +1,18 @@
+#sidebar {
+  flex: 0 0 min(280px, 38vw);
+  /* flex:25%; */
+  max-width: 100%;
+  min-width: 0;
+  padding: 1rem;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+#home{
+    display: flex;
+    flex-direction: row;
+}

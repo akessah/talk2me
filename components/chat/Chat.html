@@ -1,0 +1,62 @@
+<div class="chat-panel">
+    <div class="chat-panel-heading">
+        <h2>{{['Chat', 'Group'].includes(openChat?.value?.type)? openChat?.value?.title: ''}}</h2>
+        <button
+            v-if="folderNavStack.length"
+            type="button"
+            class="chat-panel-back"
+            @click="folderBack"
+        >← Back</button>
+    </div>
+    <div v-if="['Chat', 'Group'].includes(openChat?.value?.type)" class="chat-panel-body">
+        <!-- <div class="chat-folder-actions">
+            <add-to-folder-menu
+                :object-channel="openChatChannel"
+                :folders="folders"
+                :folder-updates="folderUpdates"
+                :session="session"
+                :graffiti="graffiti"
+            ></add-to-folder-menu>
+            <remove-from-folder-menu
+                :object-channel="openChatChannel"
+                :all-objects="allObjects"
+                :session="session"
+                :graffiti="graffiti"
+            ></remove-from-folder-menu>
+        </div> -->
+        <object-menu
+            :object-channel="openChatChannel"
+            :folders="folders"
+            :folder-updates="folderUpdates"
+            :session="session"
+            :all-objects="allObjects"
+            :graffiti="graffiti"
+            :folderBack="folderBack"
+            :folderNavStack="folderNavStack"
+        ></object-menu>
+        <div class="chat-message-thread">
+            <div
+                v-for="message of messages"
+                :key="message.actor + '-' + message.value.published + '-' + message.value.content"
+                class="chat-message"
+                :class="{ 'chat-message--own': isOwnMessage(message) }"
+            >
+                <div class="chat-message-meta">
+                    <strong>
+                        <graffiti-actor-to-handle :actor="message.actor">
+                        </graffiti-actor-to-handle>
+                    </strong>
+                </div>
+                <div class="chat-message-body">{{ message.value.content }}</div>
+            </div>
+        </div>
+        <form
+            v-if="openChatChannel"
+            class="chat-send-form"
+            @submit.prevent="sendMessage(newMessage)"
+        >
+            <input type="text" v-model="newMessage" placeholder="Message"/>
+            <button type="submit">Send</button>
+        </form>
+    </div>
+</div>

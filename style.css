@@ -1,0 +1,162 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap");
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #F0EBE6;
+  --surface: #E5DCCD;
+  --surface-hover: #DBCFBB;
+  --border: #D2C5B2;
+  --text: #18130C;
+  --text-muted: #5f5546;
+  --accent: #A47210;
+  --accent-hover: #855C0A;
+  --bubble: #DBCFBB;
+  --bubble-own: #D5C099;
+  --danger: #e85d5d;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: "DM Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.45;
+}
+
+#app {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  min-height: 100dvh;
+  padding: 1.25rem 1rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+#app:empty,
+#app:not(:has(h1)) {
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 0.65rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0.5rem 0.25rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: linear-gradient(to bottom, var(--bg) 70%, transparent);
+  z-index: 1;
+}
+
+.app-intro {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  padding: 0.35rem 0.5rem;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.app-intro graffiti-actor-to-handle {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.app-main {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  min-height: 0;
+  gap: 0;
+  margin: 0 -0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+
+
+/* .main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--bg);
+} */
+
+button {
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 1rem;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.05s ease;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+button[type="submit"] {
+  background: var(--accent);
+  color: #fff;
+}
+
+button[type="submit"]:hover {
+  background: var(--accent-hover);
+}
+
+button:not([type="submit"]) {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+button:not([type="submit"]):hover {
+  background: var(--surface-hover);
+}
+
+graffiti-actor-to-handle {
+  font-family: inherit;
+}
