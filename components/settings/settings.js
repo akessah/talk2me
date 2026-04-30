@@ -75,67 +75,61 @@ const folderUpdateDiscoverOpts = {
 
 
 
-function setup(props, { emit }) {
-	// const { objects: chats } = useGraffitiDiscover(
-  //     [`${props.appName} chats`],
-  //     chatDiscoverOpts,
-  //     props.session
-	// );
-	// const { objects: groups } = useGraffitiDiscover(
-  //     [`${props.appName} groups`],
-  //     groupDiscoverOpts,
-  //     props.session
-	// );
-	// const { objects: folders } = useGraffitiDiscover(
-  //     () => (props.session ? [`${props.session.actor}/folders`] : []),
-  //     folderDiscoverOpts,
-  //     props.session
-	// );
+function setup(props) {
+	const { objects: chats } = useGraffitiDiscover(
+      [`${props.appName} chats`],
+      chatDiscoverOpts,
+      props.session
+	);
+	const { objects: groups } = useGraffitiDiscover(
+      [`${props.appName} groups`],
+      groupDiscoverOpts,
+      props.session
+	);
+	const { objects: folders } = useGraffitiDiscover(
+      () => (props.session ? [`${props.session.actor}/folders`] : []),
+      folderDiscoverOpts,
+      props.session
+	);
 
-	// const allObjects = computed(() => [
-  //     ...chats.value,
-  //     ...groups.value,
-  //     ...folders.value,
-	// ]);
+	const allObjects = computed(() => [
+      ...chats.value,
+      ...groups.value,
+      ...folders.value,
+	]);
 
-
-	// const { objects: folderUpdates } = useGraffitiDiscover(
-  //     () => (props.session ? [`${props.session.actor}/folders`] : []),
-  //     folderUpdateDiscoverOpts,
-  //     props.session
-	// );
+	const { objects: folderUpdates } = useGraffitiDiscover(
+      () => (props.session ? [`${props.session.actor}/folders`] : []),
+      folderUpdateDiscoverOpts,
+      props.session
+	);
 
 
 
 
 	const newObject = ref(false);
-	// const folderNavStack = ref([]);
-	// const openChatChannel = ref("");
-	// const openChat = computed(() =>
-  //     props.allObjects.find(
-  //         (chat) => chat.value.channel === openChatChannel.value
-  //     )
-  // );
+	const folderNavStack = ref([]);
+	const openChatChannel = ref("");
+	const openChat = computed(() =>
+      allObjects.value.find(
+          (chat) => chat.value.channel === openChatChannel.value
+      )
+  );
 
 	function folderBack() {
-      const s = props.folderNavStack;
+      const s = folderNavStack.value;
       if (s.length === 0) {
-          // props.openChatChannel = "";
-          emit('changeChatChannel', "");
+          openChatChannel.value = "";
           return;
       }
       const parent = s[s.length - 1];
-      // props.folderNavStack = s.slice(0, -1);
-      emit('changeNavStack', s.slice(0, -1));
-      emit('changeChatChannel', parent);
-      // props.openChatChannel = parent;
+      folderNavStack.value = s.slice(0, -1);
+      openChatChannel.value = parent;
 	}
 
 	function openObjectFromRoot(obj) {
-      // props.folderNavStack = [];
-      emit('changeNavStack', []);
-      emit('changeChatChannel', obj.value.channel);
-      // props.openChatChannel = obj.value.channel;
+      folderNavStack.value = [];
+      openChatChannel.value = obj.value.channel;
 	}
 
 
@@ -163,13 +157,13 @@ function setup(props, { emit }) {
     }
 
     const sidebarFolderChannel = computed(() => {
-        const ch = props.openChatChannel;
+        const ch = openChatChannel.value;
         if (!ch) return null;
-        const obj = props.openChat;
+        const obj = openChat.value;
         if (!obj?.value) return null;
         if (obj.value.type === "Folder") return ch;
         if (obj.value.type === "Chat" || obj.value.type === "Group") {
-            return currentFolderForObject(props.folderUpdates, ch);
+            return currentFolderForObject(folderUpdates.value, ch);
         }
         return null;
     });
@@ -178,8 +172,8 @@ function setup(props, { emit }) {
 
   const objectsInFolder = computed(()=>{
       const objs = new Set()
-      for (const update of props.folderUpdates){
-          if (currentFolderForObject(props.folderUpdates, update.value.obj) !== null)
+      for (const update of folderUpdates.value){
+          if (currentFolderForObject(folderUpdates.value, update.value.obj) !== null)
               objs.add(update.value.obj)
       }
       return objs
@@ -187,7 +181,7 @@ function setup(props, { emit }) {
 
 
   const root = computed(()=>{
-      return props.allObjects.filter(o=> !objectsInFolder.value.has(o.value.channel))
+      return allObjects.value.filter(o=> !objectsInFolder.value.has(o.value.channel))
   })
 
 
@@ -195,12 +189,14 @@ function setup(props, { emit }) {
 
 	return {
 		newObject,
-		// openChatChannel,
-		// openChat,
-		// folderNavStack,
+		openChatChannel,
+		openChat,
+		folderNavStack,
 		folderBack,
 		openObjectFromRoot,
-		// folderUpdates,
+		allObjects,
+		folders,
+		folderUpdates,
 		sidebarFolderChannel,
 		toggleNew,
     root
@@ -211,8 +207,7 @@ function setup(props, { emit }) {
 
 
 export default async () => ({
-  props: ['graffiti', 'session', 'appName', 'contacts', 'allObjects', 'folders', 'folderNavStack', 'openChat', 'openChatChannel', 'folderUpdates'],
-  emits: ['changeChatChannel', 'changeNavStack'],
+  props: ['graffiti', 'session', 'appName'],
   setup,
   template: await fetch(new URL("./home.html", import.meta.url)).then((r) =>
     r.text(),

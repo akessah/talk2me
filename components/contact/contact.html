@@ -1,0 +1,45 @@
+<div id="contact">
+    <!-- <h1>contact!</h1> -->
+    <div class="profile">
+        <!-- <img class="profile-pic" @click="zoom=!zoom" :src="profilePic"/> -->
+        <!-- <button v-if="zoom">Change Image</button> -->
+        <div class="title">
+            <h1 v-if="!editUsername">{{contact.value?.username}}</h1>
+            <button v-if="!editUsername" @click="{editUsername=!editUsername; usernameBuf=contact.value.username;}">Change</button>
+            <form @submit.prevent="changeUsername" v-else>
+                <input type="text" v-model="usernameBuf"/>
+                <button type="submit">Save</button>
+            </form>
+            <h2>{{contact.value?.handle}}.actor.graffiti</h2>
+        </div>
+        <div class="buttons">
+            <button id="notification-button">notifications</button>
+            <button id="mute-button">mute</button>
+            <button id="search-button">search</button>
+            <button id="block-button">block</button>
+            <button id="chat-button">chat</button>
+        </div>
+        <div class="chat-list">
+            <ul class="chats-list" v-if="showList=='chats'">
+                <li v-for="chat of contactChats" :key="chat.value.channel">
+                    <button type="button" @click="openObjectFromRoot(obj)">
+                    <!-- <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
+                    <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else> -->
+                        {{chat.value.title}}
+                    </button>
+                </li>
+            </ul>
+            <ul class="chats-list" v-else>
+                <li v-for="group of contactGroups" :key="chat.value.channel">
+                    <button type="button" @click="openObjectFromRoot(obj)">
+                    <!-- <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
+                    <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else> -->
+                        {{group.value.title}}
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+
+</div>

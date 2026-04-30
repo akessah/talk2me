@@ -5,7 +5,8 @@ export default {
     session: { type: Object, required: true },
     graffiti: { type: Object, required: true },
     appName: { type: String, required: true },
-    toggleNew: { type: Function, required: true}
+    toggleNew: { type: Function, required: true },
+    contacts: { type: Array, required: true }
   },
   setup(props) {
     const newChatName = ref("");
@@ -22,6 +23,29 @@ export default {
       const otherActor = await props.graffiti.handleToActor(
         `${other}.graffiti.actor`
       );
+      console.log(props.contacts.find(c => c.value.actor === otherActor))
+      if (props.contacts.find(c => c.value.actor === otherActor) === undefined){
+        console.log('adding contact')
+        console.log(props.session.actor)
+        console.log(typeof otherActor, typeof other)
+        await props.graffiti.post(
+          {
+            value: {
+              actor: otherActor,
+              username: other,
+              handle: other,
+              published: Date.now(),
+            },
+            allowed: [],
+            channels: [
+              `${props.session.actor} contacts`,
+              'my contacts'
+            ],
+          },
+          props.session
+        );
+        console.log('done adding contact')
+      }
       await props.graffiti.post(
         {
           value: {
@@ -44,6 +68,33 @@ export default {
 
     async function createGroup(name, others) {
       others = splitHandles(others);
+      others = await Promise.all(
+            others.map(async (handle) => {
+              const actor = await props.graffiti.handleToActor(
+                `${handle}.graffiti.actor`
+              );
+              return {handle, actor};
+            })
+          );
+      for (const other of others){
+          if (props.contacts.find(c => c.value.actor === otherActor) === undefined){
+            await props.graffiti.post(
+              {
+                value: {
+                  actor: other.actor,
+                  username: other.handle,
+                  handle: other.handle,
+                  published: Date.now(),
+                },
+                allowed: [],
+                channels: [
+                  `${props.session.actor} contacts`
+                ],
+              },
+              props.session
+            );
+          }
+      }
       await props.graffiti.post(
         {
           value: {

@@ -1,5 +1,15 @@
 <ul id="folder-sidebar">
     <h2>{{ sidebarListTitle || openChat?.value?.title }}</h2>
+    <object-menu
+        :object-channel="openChatChannel"
+        :folders="folders"
+        :folder-updates="folderUpdates"
+        :session="session"
+        :all-objects="allObjects"
+        :graffiti="graffiti"
+        :folderBack="folderBack"
+        :folderNavStack="folderNavStack"
+    ></object-menu>
     <button
         type="button"
         class="sidebar-back"

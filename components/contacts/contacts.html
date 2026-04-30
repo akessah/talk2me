@@ -1,0 +1,11 @@
+<div id="contacts">
+    <h1>Contacts</h1>
+    <ul>
+        <li v-for="contact of curContacts">
+            <router-link :to="`/contacts/${contact.value?.handle}`">
+                {{contact.value?.username}}
+            </router-link>
+        </li>
+    </ul>
+
+</div>

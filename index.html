@@ -27,7 +27,7 @@
         <div id="app">Loading...</div>
         <template id="template">
             <header>
-                <h1>Talk2Me</h1>
+                <router-link :to="`/`"><h1>Talk2Me</h1></router-link>
             </header>
 
             <main>
@@ -40,15 +40,28 @@
                     <button @click="$graffiti.logout($graffitiSession.value)">
                         Log Out
                     </button>
+                    <button @click="deleteContacts" :disabled="deleting">{{deleting? 'Deleting...':'Delete Contacts'}}</button>
+                    <button @click="deleteObjects" :disabled="deleting">{{deleting? 'Deleting...':'Delete Objects'}}</button>
+                    <button><router-link :to="'/contacts'">Contacts</router-link></button>
 
-                    <!-- <p>router!</p> -->
+
+                    <p>router!</p>
                     <router-view
                         :session="session"
                         :graffiti="graffiti"
                         :app-name="appName"
+                        :contacts="contacts"
+                        :all-objects="allObjects"
+                        :folders="folders"
+                        :folder-nav-stack="folderNavStack"
+                        :open-chat-channel="openChatChannel"
+                        :open-chat="openChat"
+                        :folder-updates="folderUpdates"
+                        @change-chat-channel="changeChatChannel"
+                        @change-nav-stack="changeNavStack"
                     >
                     </router-view>
-                    <!-- <p>router!</p> -->
+                    <p>router!</p>
                 </template>
 
             </main>

@@ -9,6 +9,7 @@
             :graffiti="graffiti"
             :appName="appName"
             :toggleNew="toggleNew"
+            :contacts="contacts"
             v-if="newObject"
         ></new-object-sidebar>
 
@@ -21,11 +22,16 @@
             :folderUpdates="folderUpdates"
             :sidebarFolderChannel="sidebarFolderChannel"
             :folderBack="folderBack"
+            :folders="folders"
+            :session="session"
+            :graffiti="graffiti"
+            @changeNavStack="$emit('changeNavStack', $event)"
+            @changeChatChannel="$emit('changeChatChannel', $event)"
             v-else-if="sidebarFolderChannel"
         ></folder-sidebar>
 
         <root-sidebar
-            :allObjects="allObjects"
+            :allObjects="root"
             :openChatChannel="openChatChannel"
             :openObjectFromRoot="openObjectFromRoot"
             v-else

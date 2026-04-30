@@ -1,4 +1,6 @@
 import { ref, toRefs, computed } from "vue";
+import ObjectMenu from "../ObjectMenu/ObjectMenu.js";
+
 export default {
   props: {
     openChat: { type: Object, default: undefined },
@@ -7,10 +9,13 @@ export default {
     folderNavStack: { type: Array, required: true},
     folderUpdates: { type: Array, required: true },
     sidebarFolderChannel: { type: String, default: ""},
-    folderBack: { type: Function, required: true}
+    folderBack: { type: Function, required: true},
+    folders: { type: Array, required: true},
+    session: { type: Object, required: true },
+    graffiti: { type: Object, required: true },
 
   },
-  setup(props) {
+  setup(props, { emit }) {
     function latestFolderUpdatesByPair(updates) {
         const byPair = new Map();
         for (const u of updates || []) {
@@ -71,8 +76,10 @@ export default {
         )
     );
     function openObjectFromFolder(obj) {
-		props.folderNavStack = [...props.folderNavStack, props.openChatChannel];
-		props.openChatChannel = obj.value.channel;
+        emit('changeNavStack', [...props.folderNavStack, props.openChatChannel])
+		// props.folderNavStack = [...props.folderNavStack, props.openChatChannel];
+        emit('changeChatChannel', obj.value.channel)
+		// props.openChatChannel = obj.value.channel;
 	}
     return {
         openObjectFromFolder,
@@ -83,5 +90,9 @@ export default {
   },
   template: await fetch(new URL("./FolderSidebar.html", import.meta.url)).then((r) =>
     r.text(),
-  )
+  ),
+  components: {
+    ObjectMenu
+  },
+  emits: ['changeChatChannel', 'changeNavStack'],
 }
