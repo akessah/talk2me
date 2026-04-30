@@ -2,13 +2,13 @@
     <h3>Create Chat</h3>
     <form @submit.prevent="createChat(newChatName, otherHandle)">
         <input type="text" v-model="newChatName" placeholder="Chat Name"/>
-        <input type="text" v-model="otherHandle" placeholder="To"/>
+        <input type="text" v-model="otherHandle" placeholder="Graffiti Handle"/>
         <button type="submit">Create Chat</button>
     </form>
     <h3>Create Group</h3>
     <form @submit.prevent="createGroup(newGroupName, otherHandles)">
         <input type="text" v-model="newGroupName" placeholder="Group Name"/>
-        <input type="text" v-model="otherHandles" placeholder="To (separated by commas)"/>
+        <input type="text" v-model="otherHandles" placeholder="Graffiti Handles (separated by commas)"/>
         <button type="submit">Create Group</button>
     </form>
     <h3>Create Folder</h3>

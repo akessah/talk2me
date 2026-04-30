@@ -17,25 +17,29 @@
             <button id="mute-button">mute</button>
             <button id="search-button">search</button>
             <button id="block-button">block</button>
-            <button id="chat-button">chat</button>
+            <router-link :to="'/'"><button id="chat-button" @click="createChat">chat</button></router-link>
         </div>
         <div class="chat-list">
             <ul class="chats-list" v-if="showList=='chats'">
                 <li v-for="chat of contactChats" :key="chat.value.channel">
-                    <button type="button" @click="openObjectFromRoot(obj)">
-                    <!-- <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
-                    <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else> -->
-                        {{chat.value.title}}
-                    </button>
+                    <router-link :to="'/'">
+                        <button type="button" @click="openChat(chat)">
+                        <!-- <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
+                        <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else> -->
+                            {{chat.value.title}}
+                        </button>
+                    </router-link>
                 </li>
             </ul>
             <ul class="chats-list" v-else>
                 <li v-for="group of contactGroups" :key="chat.value.channel">
-                    <button type="button" @click="openObjectFromRoot(obj)">
+                    <router-link :to="`/`">
+                    <button type="button" @click="openChat(group)">
                     <!-- <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
                     <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else> -->
                         {{group.value.title}}
                     </button>
+                    </router-link>
                 </li>
             </ul>
         </div>

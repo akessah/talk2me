@@ -12,12 +12,12 @@ import {
 const contactDiscoverOpts = {
   properties: {
     value: {
-      required: ["username", "handle", "actor", "published"],
+      required: ["username", "handle", "actorId", "published"],
       // required: [],
       properties: {
         username: { type: "string"},
         handle: { type: "string" },
-        actor: { type: "string" },
+        actorId: { type: "string" },
         published: { type: "number" },
       },
     },

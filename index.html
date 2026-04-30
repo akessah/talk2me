@@ -42,7 +42,7 @@
                     </button>
                     <button @click="deleteContacts" :disabled="deleting">{{deleting? 'Deleting...':'Delete Contacts'}}</button>
                     <button @click="deleteObjects" :disabled="deleting">{{deleting? 'Deleting...':'Delete Objects'}}</button>
-                    <button><router-link :to="'/contacts'">Contacts</router-link></button>
+                    <router-link :to="'/contacts'"><button>Contacts</button></router-link>
 
 
                     <p>router!</p>

@@ -28,10 +28,10 @@ export default {
         console.log('adding contact')
         console.log(props.session.actor)
         console.log(typeof otherActor, typeof other)
-        await props.graffiti.post(
+        console.log(await props.graffiti.post(
           {
             value: {
-              actor: otherActor,
+              actorId: otherActor,
               username: other,
               handle: other,
               published: Date.now(),
@@ -43,7 +43,7 @@ export default {
             ],
           },
           props.session
-        );
+        ));
         console.log('done adding contact')
       }
       await props.graffiti.post(

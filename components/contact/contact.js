@@ -27,10 +27,11 @@ function setup(props, { emit }) {
     const usernameBuf = ref("contact.value.value.username")
     // const username = ref(contact.value.username)
     const contactChats = computed(()=>{
-        props.allObjects.filter(o=>{return o.allowed.includes(contact.value.actor)&&o.value.type==='Chat'})
+        // return props.allObjects
+        return props.allObjects.filter(o=>{return o.allowed.includes(contact?.value?.value?.actorId)&&o.value.type==='Chat'})
     })
     const contactGroups = computed(()=>{
-        props.allObjects.filter(o=>{return o.allowed.includes(contact.value.actor)&&o.value.type==='Group'})
+        return props.allObjects.filter(o=>{return o.allowed.includes(contact.value.actorId)&&o.value.type==='Group'})
     })
 
     async function changeUsername(){
@@ -39,7 +40,7 @@ function setup(props, { emit }) {
 
         console.log(JSON.stringify(await props.graffiti.post({
             value: {
-              actor: contact.value.actor,
+              actorId: contact.value.actor,
               username: usernameBuf.value,
               handle: props.contactId,
               published: Date.now(),
@@ -84,12 +85,28 @@ function setup(props, { emit }) {
 
     const objectsInFolder = computed(()=>{
         const objs = new Set()
-        for (const update of folderUpdates.value){
-            if (currentFolderForObject(folderUpdates.value, update.value.obj) !== null)
+        for (const update of props.folderUpdates){
+            if (currentFolderForObject(props.folderUpdates, update.value.obj) !== null)
                 objs.add(update.value.obj)
         }
         return objs
     })
+
+    function openObjectFromRoot(obj) {
+        // props.folderNavStack = [];
+        emit('changeNavStack', []);
+        // emit('clearNavStack')
+        // props.openChatChannel = obj.value.channel;
+        emit('changeChatChannel', obj.value.channel)
+
+	}
+    function openObjectFromFolder(obj) {
+        // emit('addToNavStack', props.openChatChannel)
+		// props.folderNavStack = [...props.folderNavStack, props.openChatChannel];
+        emit('changeNavStack', [...props.folderNavStack, props.openChatChannel])
+		// props.openChatChannel = obj.value.channel;
+        emit('changeChatChannel', obj.value.channel)
+	}
 
     function openChat(chat){
         if(objectsInFolder.value.has(chat))
@@ -98,19 +115,37 @@ function setup(props, { emit }) {
             openObjectFromRoot(chat)
     }
 
-    function openObjectFromRoot(obj) {
-        props.folderNavStack = [];
-        // emit('clearNavStack')
-        // props.openChatChannel = obj.value.channel;
-        emit('changeChatChannel', obj.value.channel)
+    async function createChat() {
+        const newChatChannel = crypto.randomUUID();
 
-	}
-    function openObjectFromFolder(obj) {
-        // emit('addToNavStack', props.openChatChannel)
-		props.folderNavStack = [...props.folderNavStack, props.openChatChannel];
-		// props.openChatChannel = obj.value.channel;
-        emit('changeChatChannel', obj.value.channel)
-	}
+      emit('changeChatChannel', newChatChannel);
+      emit('changeNavStack', []);
+
+      const newChat = await props.graffiti.post(
+        {
+          value: {
+            activity: "Create",
+            type: "Chat",
+            channel: newChatChannel,
+            title: 'Untitled Chat',
+            published: Date.now(),
+          },
+          allowed: [contact.value.value.actorId],
+          channels: [
+            `${props.appName} chats`,
+            `${props.session.actor}/chats`,
+          ],
+        },
+        props.session
+      );
+
+      console.log(newChatChannel)
+      console.log(typeof newChatChannel)
+
+
+    }
+
+
 
 
 	return {
@@ -123,7 +158,8 @@ function setup(props, { emit }) {
         changeUsername,
         contactChats,
         contactGroups,
-        openChat
+        openChat,
+        createChat,
 
 	};
 }
@@ -132,8 +168,8 @@ function setup(props, { emit }) {
 
 
 export default async () => ({
-  props: ['graffiti', 'session', 'contactId', 'contacts', 'allObjects', 'folders', 'folderNavStack', 'openChatChannel'],
-  emits: ['changeChatChannel'],
+  props: ['graffiti', 'session', 'contactId', 'contacts', 'allObjects', 'folders', 'folderNavStack', 'openChatChannel', 'folderUpdates', 'appName'],
+  emits: ['changeChatChannel', 'changeNavStack'],
   setup,
   template: await fetch(new URL("./contact.html", import.meta.url)).then((r) =>
     r.text(),
