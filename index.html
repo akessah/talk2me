@@ -40,8 +40,8 @@
                     <button @click="$graffiti.logout($graffitiSession.value)">
                         Log Out
                     </button>
-                    <button @click="deleteContacts" :disabled="deleting">{{deleting? 'Deleting...':'Delete Contacts'}}</button>
-                    <button @click="deleteObjects" :disabled="deleting">{{deleting? 'Deleting...':'Delete Objects'}}</button>
+                    <!-- <button @click="deleteContacts" :disabled="deleting">{{deleting? 'Deleting...':'Delete Contacts'}}</button>
+                    <button @click="deleteObjects" :disabled="deleting">{{deleting? 'Deleting...':'Delete Objects'}}</button> -->
                     <router-link :to="'/contacts'"><button>Contacts</button></router-link>
 
 
