@@ -58,6 +58,7 @@
                                     @click="navigate"
                                 >
                                     <img src="./media/home.svg" alt="" />
+                                    Home
                                 </button>
                             </router-link>
                             <router-link to="/inbox" custom v-slot="{ navigate, isActive }">
@@ -84,6 +85,7 @@
                                     :class="{ 'app-tab--active': isActive }"
                                     @click="navigate"
                                 >
+                                <img src="./media/contacts.svg" class="icon"/>
                                     Contacts
                                 </button>
                             </router-link>
