@@ -1,0 +1,33 @@
+<div id="inbox">
+    <p v-if="!notifications.length" class="inbox-empty">You’re all caught up.</p>
+    <ul v-else class="inbox-list" aria-label="Message notifications">
+        <li
+            v-for="n in notifications"
+            :key="n.key"
+            class="inbox-list__item"
+        >
+            <button
+                type="button"
+                class="inbox-list__link"
+                @click="onOpen(n)"
+            >
+                <span class="inbox-list__avatar" aria-hidden="true">{{ chatInitials(n) }}</span>
+                <span class="inbox-list__meta">
+                    <span class="inbox-list__name">
+                        {{ n.title }}
+                        <span v-if="n.unreadCount > 1" class="inbox-list__count">({{ n.unreadCount }})</span>
+                    </span>
+                    <span class="inbox-list__sub">
+                        <template v-if="n.sender">{{ n.sender }}</template>
+                        <span v-else class="inbox-list__handle-wrap">
+                            <graffiti-actor-to-handle :actor="n.senderActor"></graffiti-actor-to-handle>
+                        </span>
+                        <span class="inbox-list__dot" aria-hidden="true"> · </span>
+                        <span class="inbox-list__time">{{ n.when }}</span>
+                    </span>
+                    <span class="inbox-list__preview">{{ n.preview }}</span>
+                </span>
+            </button>
+        </li>
+    </ul>
+</div>

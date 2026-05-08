@@ -1,15 +1,37 @@
 <div id="new-object-sidebar">
     <h3>Create Chat</h3>
-    <form @submit.prevent="createChat(newChatName, otherHandle)">
+    <form @submit.prevent="createChat(newChatName, otherHandle)" class="new-chat-form">
         <input type="text" v-model="newChatName" placeholder="Chat Name"/>
-        <input type="text" v-model="otherHandle" placeholder="Graffiti Handle"/>
+        <div class="new-chat-form__handle-field">
+            <input
+                type="text"
+                v-model="otherHandle"
+                placeholder="Username or Graffiti Handle"
+                class="new-chat-form__handle-input"
+                :class="{
+                    'new-chat-form__handle-input--shake': shakeHandleInput,
+                    'new-chat-form__handle-input--error': handleError,
+                }"
+                :aria-invalid="handleError"
+                :aria-describedby="handleError ? 'new-chat-handle-error' : undefined"
+                @animationend="clearHandleShakeAnimation"
+            />
+            <p
+                v-if="handleError"
+                id="new-chat-handle-error"
+                class="new-chat-form__handle-error"
+                role="alert"
+            >
+                This graffiti handle was not found. Please try again.
+            </p>
+        </div>
         <button type="submit">Create Chat</button>
     </form>
     <h3>Create Group</h3>
     <form @submit.prevent="createGroup(newGroupName, otherHandles)">
-        <input type="text" v-model="newGroupName" placeholder="Group Name"/>
-        <input type="text" v-model="otherHandles" placeholder="Graffiti Handles (separated by commas)"/>
-        <button type="submit">Create Group</button>
+        <input type="text" v-model="newGroupName" placeholder="Group Name" disabled/>
+        <input type="text" v-model="otherHandles" placeholder="Graffiti Handles (use commas)" disabled/>
+        <button type="submit" disabled>Create Group</button>
     </form>
     <h3>Create Folder</h3>
     <form @submit.prevent="createFolder(newFolderName)">

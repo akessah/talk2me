@@ -36,11 +36,12 @@ function setup(props, { emit }) {
 
     async function changeUsername(){
         console.log('changing username')
-        console.log(props.contactId)
+        console.log(contact.value)
+        console.log(contact.value.value.actorId)
 
         console.log(JSON.stringify(await props.graffiti.post({
             value: {
-              actorId: contact.value.actor,
+              actorId: contact.value.value.actorId,
               username: usernameBuf.value,
               handle: props.contactId,
               published: Date.now(),
@@ -138,6 +139,38 @@ function setup(props, { emit }) {
         },
         props.session
       );
+
+      await props.graffiti.post(
+        {
+          value: {
+            activity: "Add",
+            type: "Participant",
+            actorId: contact.value.value.actorId,
+            published: Date.now(),
+          },
+          allowed: [contact.value.value.actorId],
+          channels: [
+            newChatChannel
+          ],
+        },
+        props.session
+      )
+
+      await props.graffiti.post(
+        {
+          value: {
+            activity: "Add",
+            type: "Participant",
+            actorId: props.session.actor,
+            published: Date.now(),
+          },
+          allowed: [contact.value.value.actorId],
+          channels: [
+            newChatChannel
+          ],
+        },
+        props.session
+      )
 
       console.log(newChatChannel)
       console.log(typeof newChatChannel)

@@ -24,19 +24,19 @@
                 <li v-for="chat of contactChats" :key="chat.value.channel">
                     <router-link :to="'/'">
                         <button type="button" @click="openChat(chat)">
-                        <!-- <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
-                        <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else> -->
+                        <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="chat.value.type === 'Folder'">
+                        <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else>
                             {{chat.value.title}}
                         </button>
                     </router-link>
                 </li>
             </ul>
             <ul class="chats-list" v-else>
-                <li v-for="group of contactGroups" :key="chat.value.channel">
+                <li v-for="group of contactGroups" :key="group.value.channel">
                     <router-link :to="`/`">
                     <button type="button" @click="openChat(group)">
-                    <!-- <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
-                    <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else> -->
+                    <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="group.value.type === 'Folder'">
+                    <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else>
                         {{group.value.title}}
                     </button>
                     </router-link>

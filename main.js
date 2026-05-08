@@ -1,4 +1,4 @@
-import { createApp, defineAsyncComponent, computed, ref } from "vue";
+import { createApp, defineAsyncComponent, computed, ref, provide, watch, nextTick } from "vue";
 import { createRouter, createWebHashHistory } from "vue-router";
 import { GraffitiLocal } from "@graffiti-garden/implementation-local";
 import { GraffitiDecentralized } from "@graffiti-garden/implementation-decentralized";
@@ -8,6 +8,7 @@ import {
   useGraffitiSession,
   useGraffitiDiscover,
 } from "@graffiti-garden/wrapper-vue";
+import { getLastRead } from "./components/chatReadState.js";
 
 const contactDiscoverOpts = {
   properties: {
@@ -23,6 +24,20 @@ const contactDiscoverOpts = {
     },
   },
 };
+
+const participantDiscoverOpts = {
+  properties: {
+    value: {
+      required: ["activity", "type", "actorId", "published"],
+      properties: {
+        activity: { enum: ["Add", "Remove"]},
+        type: { const: "Participant" },
+        actorId: { type: "string" },
+        published: { type: "number" },
+      },
+    },
+  },
+}
 
 const chatDiscoverOpts = {
   properties: {
@@ -83,6 +98,37 @@ const folderUpdateDiscoverOpts = {
   },
 };
 
+const messageDiscoverOpts = {
+  properties: {
+    value: {
+      required: ["content", "published"],
+      properties: {
+        content: { type: "string" },
+        published: { type: "number" },
+        tombstone: { type: "boolean" },
+        chatChannel: { type: "string" },
+      },
+    },
+  },
+};
+
+const notificationDiscoverOpts = {
+  properties: {
+    value: {
+      required: ["type", "activity", "chatChannel", "messagePublished", "fromActor", "published"],
+      properties: {
+        type: { const: "Notification" },
+        activity: { const: "Message" },
+        chatChannel: { type: "string" },
+        messagePublished: { type: "number" },
+        fromActor: { type: "string" },
+        preview: { type: "string" },
+        published: { type: "number" },
+      },
+    },
+  },
+};
+
 function loadComponent(name) {
   console.log('loaded')
   return () => import(`./components/${name}/${name}.js`).then((m) => m.default());
@@ -96,6 +142,7 @@ const router = createRouter({
     {path: "/settings", component: loadComponent("settings")},
     {path: "/contacts/:contactId", component: loadComponent("contact"), props: true},
     {path: "/contacts", component: loadComponent("contacts")},
+    {path: "/inbox", component: loadComponent("inbox")},
   ],
 });
 
@@ -162,7 +209,13 @@ createApp({
         async function deleteObjects(){
           deleting.value = true
           for (const obj of allObjects.value){
-            await graffiti.delete(obj, session.value)
+            try{
+              await graffiti.delete(obj, session.value)
+            }catch(e){
+              console.log(e)
+              continue
+            }
+
           }
           deleting.value=false
         }
@@ -175,6 +228,98 @@ createApp({
           folderNavStack.value = newStack;
         }
 
+        function openChatAndGoHome(channel) {
+          if (!channel) return;
+          folderNavStack.value = [];
+          openChatChannel.value = channel;
+          router.push("/");
+        }
+
+        provide("openChatAndGoHome", openChatAndGoHome);
+
+        // Inbox unread count (notification objects + per-chat lastRead in localStorage)
+        const lastReadTick = ref(0);
+        window.addEventListener("talk2me:lastReadChanged", () => {
+          lastReadTick.value++;
+        });
+
+        const notificationChannels = computed(() =>
+          session.value?.actor ? [`${session.value.actor}/notifications`] : [],
+        );
+        // IMPORTANT: use the session object (not ref) for discover, to match
+        // other components which pass a plain session object.
+        const { objects: notifications } = useGraffitiDiscover(
+          () => notificationChannels.value,
+          notificationDiscoverOpts,
+          () => session.value,
+          true,
+        );
+
+        const inboxUnreadCount = computed(() => {
+          void lastReadTick.value;
+          const actor = session.value?.actor;
+          if (!actor) return 0;
+          const list = Array.isArray(notifications.value)
+            ? notifications.value
+            : [];
+          const unreadChats = new Set();
+          for (const notif of list) {
+            const v = notif?.value;
+            const ch = v?.chatChannel;
+            if (!ch) continue;
+            const lr = getLastRead(actor, ch);
+            const msgPub = v?.messagePublished ?? 0;
+            if (msgPub > lr) unreadChats.add(ch);
+          }
+          // Dedupe: count unread chats (not individual notification objects).
+          return unreadChats.size;
+        });
+
+        const inboxBellRinging = ref(false);
+        let ringTimeout = null;
+        const newestNotificationTs = computed(() => {
+          const list = Array.isArray(notifications.value)
+            ? notifications.value
+            : [];
+          let best = 0;
+          for (const notif of list) {
+            const v = notif?.value;
+            const ts = v?.published ?? 0;
+            if (ts > best) best = ts;
+          }
+          return best;
+        });
+        watch(newestNotificationTs, (next, prev) => {
+          if (next > prev) {
+            inboxBellRinging.value = true;
+            if (ringTimeout) clearTimeout(ringTimeout);
+            ringTimeout = setTimeout(() => {
+              inboxBellRinging.value = false;
+            }, 500);
+          }
+        });
+
+        function updateTabsIndicator() {
+          const tabs = document.querySelector(".app-tabs");
+          if (!tabs) return;
+          const active = tabs.querySelector(".app-tab--active");
+          const indicator = tabs.querySelector(".app-tabs__indicator");
+          if (!active || !indicator) return;
+          const tabsRect = tabs.getBoundingClientRect();
+          const a = active.getBoundingClientRect();
+          const left = Math.max(0, a.left - tabsRect.left);
+          const width = Math.max(0, a.width);
+          tabs.style.setProperty("--tabs-indicator-left", `${left}px`);
+          tabs.style.setProperty("--tabs-indicator-width", `${width}px`);
+        }
+
+        // Keep indicator in sync with route changes + layout changes.
+        router.afterEach(async () => {
+          await nextTick();
+          updateTabsIndicator();
+        });
+        window.addEventListener("resize", () => updateTabsIndicator());
+        nextTick(() => updateTabsIndicator());
 
         return {
             appName,
@@ -188,10 +333,13 @@ createApp({
             openChat,
             deleting,
             folderUpdates,
+            inboxUnreadCount,
+            inboxBellRinging,
+            updateTabsIndicator,
             deleteContacts,
             deleteObjects,
             changeChatChannel,
-            changeNavStack
+            changeNavStack,
         };
   },
     template: "#template",

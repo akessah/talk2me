@@ -1,42 +1,79 @@
-<button @click="menuOpen=!menuOpen">menu</button>
-<ul id="object-menu" v-if="menuOpen">
-    <li id="add-to-folder" v-if="objectChannel">
-        <button
-            type="button"
-            class="add-to-folder-menu__toggle"
-            @click="toggleMenu"
-            :aria-expanded="addMenuOpen"
-        >
-            Add to folder
-        </button>
-        <div
-            v-show="addMenuOpen"
-            class="add-to-folder-menu__dropdown"
-            role="menu"
-        >
-            <p v-if="!targetFolders.length" class="add-to-folder-menu__empty">
-                No other folders yet
-            </p>
-            <ul v-else class="add-to-folder-menu__list">
-                <li v-for="folder of targetFolders" :key="folder.value.channel">
-                    <button
-                        type="button"
-                        role="menuitem"
-                        @click="addToFolder(folder.value.channel)"
-                    >
-                        {{ folder.value.title }}
-                    </button>
-                </li>
-            </ul>
-        </div>
-    </li>
-    <li id="remove-from-menu" v-if="objectChannel && folderNavStack.length">
-        <button
-            type="button"
-            class="remove-from-folder-menu__toggle"
-            @click="removeFromFolder"
-        >
-            Remove from {{ parentFolderTitle }}
-        </button>
-    </li>
-</ul>
+<div class="object-menu">
+    <button
+        ref="menuButtonRef"
+        class="object-menu-button"
+        type="button"
+        :aria-expanded="menuOpen"
+        aria-haspopup="menu"
+        @click="menuOpen=!menuOpen"
+    >
+        <img src="./media/menu.svg" alt="menu">
+    </button>
+
+    <div class="object-menu__panel" v-if="menuOpen">
+        <ul class="object-menu__list" ref="menuListRef" role="menu" aria-label="Menu">
+            <li class="object-menu__item" v-if="objectChannel">
+                <button
+                    type="button"
+                    class="object-menu__button add-to-folder-menu__toggle"
+                    @click="toggleMenu"
+                    :aria-expanded="addMenuOpen"
+                >
+                    Add to folder
+                </button>
+                <div
+                    v-show="addMenuOpen"
+                    class="add-to-folder-menu__dropdown"
+                    role="menu"
+                >
+                    <ul class="add-to-folder-menu__list">
+                        <li>
+                            <button
+                                type="button"
+                                class="object-menu__button"
+                                role="menuitem"
+                                @click="createFolderAndMove"
+                            >
+                                Create new folder…
+                            </button>
+                        </li>
+                        <li v-if="!targetFolders.length" class="add-to-folder-menu__empty">
+                            No other folders yet
+                        </li>
+                        <li v-for="folder of targetFolders" :key="folder.value.channel">
+                            <button
+                                type="button"
+                                class="object-menu__button"
+                                role="menuitem"
+                                @click="addToFolder(folder.value.channel)"
+                            >
+                                {{ folder.value.title }}
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+
+            <li class="object-menu__item" v-if="objectChannel && folderNavStack.length">
+                <button
+                    type="button"
+                    class="object-menu__button remove-from-folder-menu__toggle"
+                    @click="removeFromFolder"
+                >
+                    Remove from {{ parentFolderTitle }}
+                </button>
+            </li>
+
+            <li class="object-menu__item">
+                <button
+                    type="button"
+                    class="object-menu__button object-menu__button--danger"
+                    @click="deleteObject"
+                    disabled
+                >
+                    Delete
+                </button>
+            </li>
+        </ul>
+    </div>
+</div>

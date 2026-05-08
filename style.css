@@ -7,20 +7,22 @@
 }
 
 :root {
-  --bg: #F0EBE6;
-  --surface: #E5DCCD;
-  --surface-hover: #DBCFBB;
-  --border: #D2C5B2;
+  --bg: #ffffff;
+  --surface: #fcfafe;
+  --surface-hover: #cabbdb;
+  --border: #c1b2d2;
   --text: #18130C;
-  --text-muted: #5f5546;
-  --accent: #A47210;
-  --accent-hover: #855C0A;
-  --bubble: #DBCFBB;
-  --bubble-own: #D5C099;
+  --text-muted: #52465f;
+  --accent: #5510a4;
+  --accent-hover: #410a85;
+  --bubble: #c9bbdb;
+  --bubble-own: #b999d5;
   --danger: #e85d5d;
   --radius: 10px;
   --radius-sm: 8px;
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  /* Inline UI icons (SVGs often have huge intrinsic width/height) */
+  --icon-size: 1.125rem;
 }
 
 html {
@@ -28,24 +30,39 @@ html {
   -webkit-font-smoothing: antialiased;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  min-height: 100dvh;
+  height: 100dvh;
   font-family: "DM Sans", system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.45;
+  overflow: hidden;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 #app {
   max-width: none;
   width: 100%;
   margin: 0;
-  min-height: 100dvh;
-  padding: 1.25rem 1rem 2rem;
+  height: 100%;
+  padding: 1.25rem 1rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  overflow: hidden;
 }
 
 #app:empty,
@@ -89,6 +106,91 @@ h2 {
   background: var(--surface);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+}
+
+.app-topbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.app-topbar > * {
+  flex: 0 0 auto;
+}
+
+/* Optional: keep topbar utility buttons borderless too. */
+.app-topbar > button {
+  border: none;
+}
+
+/* Tabs */
+.app-tabs {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0;
+}
+
+.app-tab {
+  /* Beat global `button:not([type="submit"])` border + background. */
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Ensure tabs never pick up the global non-submit button border. */
+.app-tabs .app-tab {
+  border: none;
+  background: none;
+}
+
+.app-tabs .app-tab:hover {
+  border: none;
+}
+
+.app-tab:hover {
+  background: rgba(201, 187, 219, 0.35);
+  color: var(--text);
+}
+
+.app-tab--active {
+  color: var(--text);
+}
+
+.app-tab--icon {
+  padding: 0.65rem 0.75rem;
+}
+
+.app-tab--icon img {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: block;
+}
+
+.app-tabs__indicator {
+  position: absolute;
+  left: var(--tabs-indicator-left, 0px);
+  bottom: -2px;
+  width: var(--tabs-indicator-width, 0px);
+  height: 2px;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: left 220ms ease, width 220ms ease;
 }
 
 .app-intro graffiti-actor-to-handle {
@@ -157,6 +259,109 @@ button:not([type="submit"]):hover {
   background: var(--surface-hover);
 }
 
+button:disabled,
+input:disabled,
+textarea:disabled,
+select:disabled {
+  background: #e6e1eb;
+  border-color: #cfc6d9;
+  color: #7a7084;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+button:disabled:hover {
+  background: #e6e1eb;
+}
+
+button:disabled:active {
+  transform: none;
+}
+
+/* Home icon: SVG has huge intrinsic size; match sibling text nav buttons */
+button.app-nav-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.75rem;
+  line-height: 1;
+}
+
+button.app-nav-btn--icon img {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Sidebar lists, contact detail lists — shared folder/chat row icons */
+img.folder-object-list__icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  max-width: var(--icon-size);
+  max-height: var(--icon-size);
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+}
+
 graffiti-actor-to-handle {
   font-family: inherit;
+}
+
+img.icon{
+  width: var(--icon-size);
+  height: var(--icon-size);
+  max-width: var(--icon-size);
+  max-height: var(--icon-size);
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+  margin-right: 0.3rem;
+}
+
+.inbox-button{
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+  position: relative;
+}
+
+.inbox-button__bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inbox-button__bell-icon {
+  transform-origin: 50% 18%;
+}
+
+.inbox-button__dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--danger);
+  border: 2px solid var(--bg);
+}
+
+@keyframes talk2me-bell-ring {
+  0% { transform: rotate(0deg); }
+  12% { transform: rotate(-16deg); }
+  24% { transform: rotate(14deg); }
+  36% { transform: rotate(-12deg); }
+  48% { transform: rotate(10deg); }
+  60% { transform: rotate(-8deg); }
+  72% { transform: rotate(6deg); }
+  84% { transform: rotate(-4deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.inbox-button--ring .inbox-button__bell-icon {
+  animation: talk2me-bell-ring 0.5s ease-in-out;
 }

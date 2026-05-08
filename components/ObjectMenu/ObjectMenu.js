@@ -1,4 +1,4 @@
-import { ref, toRefs, computed } from "vue";
+import { ref, toRefs, computed, watch, onUnmounted, nextTick } from "vue";
 
 
 export default {
@@ -15,6 +15,44 @@ export default {
   setup(props) {
     const menuOpen = ref(false);
     const addMenuOpen = ref(false);
+    const menuButtonRef = ref(null);
+    const menuListRef = ref(null);
+
+    function onDocumentClick(e) {
+      if (!menuOpen.value) return;
+      const t = e.target;
+      if (
+        menuButtonRef.value?.contains(t) ||
+        menuListRef.value?.contains(t)
+      ) {
+        return;
+      }
+      menuOpen.value = false;
+      addMenuOpen.value = false;
+    }
+
+    let documentListenerOn = false;
+    watch(menuOpen, (open) => {
+      if (open) {
+        nextTick(() => {
+          setTimeout(() => {
+            if (!menuOpen.value) return;
+            document.addEventListener("click", onDocumentClick);
+            documentListenerOn = true;
+          }, 0);
+        });
+      } else if (documentListenerOn) {
+        document.removeEventListener("click", onDocumentClick);
+        documentListenerOn = false;
+      }
+    });
+
+    onUnmounted(() => {
+      if (documentListenerOn) {
+        document.removeEventListener("click", onDocumentClick);
+        documentListenerOn = false;
+      }
+    });
 
     const targetFolders = computed(() => {
         const raw = props.folders;
@@ -39,6 +77,14 @@ export default {
     function toggleMenu() {
         addMenuOpen.value = !addMenuOpen.value;
     }
+
+    const objectType = computed(() => {
+      if (!props.objectChannel) return "";
+      const list = Array.isArray(props.allObjects) ? props.allObjects : [];
+      const obj = list.find((o) => o.value?.channel === props.objectChannel);
+      return obj?.value?.type ?? "";
+    });
+
     const parentFolderChannel = computed(() => {
         const s = props.folderNavStack;
         if (!s.length) return "";
@@ -70,6 +116,57 @@ export default {
         props.session
         );
         folderBack();
+    }
+
+    async function createFolderAndMove() {
+      if (!props.objectChannel) return;
+
+      const titleRaw = window.prompt("New folder name:");
+      const title = (titleRaw ?? "").trim();
+      if (!title) return;
+
+      // Create the folder object itself.
+      const folderChannel = crypto.randomUUID();
+      const now = Date.now();
+      await props.graffiti.post(
+        {
+          value: {
+            activity: "Create",
+            type: "Folder",
+            channel: folderChannel,
+            title,
+            published: now,
+          },
+          allowed: [],
+          channels: [`${props.session.actor}/folders`],
+        },
+        props.session
+      );
+
+      // Place the new folder into the currently open folder.
+      // - If the object we're moving is a folder, "open folder" means the folder itself,
+      //   so we put the new folder one level up (parentFolderChannel).
+      // - Otherwise (chat/group), put the new folder into the open folder (parentFolderChannel).
+      // In both cases, parentFolderChannel is the folder currently open in the sidebar.
+      const parent = parentFolderChannel.value;
+      if (parent) {
+        await props.graffiti.post(
+          {
+            value: {
+              activity: "Add",
+              obj: folderChannel,
+              target: parent,
+              published: now + 1,
+            },
+            allowed: [],
+            channels: [`${props.session.actor}/folders`],
+          },
+          props.session
+        );
+      }
+
+      // Finally, move the current object into the new folder.
+      await addToFolder(folderChannel);
     }
 
     function latestFolderUpdatesByPair(updates) {
@@ -148,6 +245,11 @@ export default {
       );
     }
 
+    async function deleteObject() {
+      await props.graffiti.delete
+
+    }
+
 
     return {
         ...toRefs(props),
@@ -156,8 +258,12 @@ export default {
         addMenuOpen,
         targetFolders,
         addToFolder,
+        createFolderAndMove,
         toggleMenu,
-        menuOpen
+        menuOpen,
+        menuButtonRef,
+        menuListRef,
+        objectType,
     };
   },
   template: await fetch(new URL("./ObjectMenu.html", import.meta.url)).then((r) =>

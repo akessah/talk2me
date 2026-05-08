@@ -16,18 +16,21 @@
             }
         </script>
         <link rel="stylesheet" href="./style.css" />
+        <link rel="stylesheet" href="./components/contacts/contacts.css" />
         <link rel="stylesheet" href="./components/NewObjectSidebar/NewObjectSidebar.css" />
         <link rel="stylesheet" href="./components/FolderSidebar/FolderSidebar.css" />
         <link rel="stylesheet" href="./components/RootSidebar/RootSidebar.css" />
+        <link rel="stylesheet" href="./components/ObjectMenu/ObjectMenu.css" />
         <link rel="stylesheet" href="./components/chat/Chat.css" />
         <link rel="stylesheet" href="./components/home/home.css" />
+        <link rel="stylesheet" href="./components/inbox/inbox.css" />
         <script src="./main.js" type="module"></script>
     </head>
     <body>
         <div id="app">Loading...</div>
         <template id="template">
             <header>
-                <router-link :to="`/`"><h1>Talk2Me</h1></router-link>
+                <h1>Talk2Me</h1>
             </header>
 
             <main>
@@ -37,15 +40,67 @@
                 <template v-else>
                     <!-- Login header -->
                     <p class="app-intro">Logged in as: <graffiti-actor-to-handle :actor="$graffitiSession.value?.actor"></graffiti-actor-to-handle></p>
-                    <button @click="$graffiti.logout($graffitiSession.value)">
-                        Log Out
-                    </button>
-                    <!-- <button @click="deleteContacts" :disabled="deleting">{{deleting? 'Deleting...':'Delete Contacts'}}</button>
-                    <button @click="deleteObjects" :disabled="deleting">{{deleting? 'Deleting...':'Delete Objects'}}</button> -->
-                    <router-link :to="'/contacts'"><button>Contacts</button></router-link>
+
+                    <div class="app-topbar">
+                        <!-- <button @click="deleteContacts" :disabled="deleting">
+                            {{deleting? 'Deleting...':'Delete Contacts'}}
+                        </button>
+                        <button @click="deleteObjects" :disabled="deleting">
+                            {{deleting? 'Deleting...':'Delete Objects'}}
+                        </button> -->
+                        <nav class="app-tabs" aria-label="Primary navigation">
+                            <router-link to="/" custom v-slot="{ navigate, isActive }">
+                                <button
+                                    type="button"
+                                    class="app-tab app-tab--icon"
+                                    :class="{ 'app-tab--active': isActive }"
+                                    aria-label="Home"
+                                    @click="navigate"
+                                >
+                                    <img src="./media/home.svg" alt="" />
+                                </button>
+                            </router-link>
+                            <router-link to="/inbox" custom v-slot="{ navigate, isActive }">
+                                <button
+                                    type="button"
+                                    class="app-tab"
+                                    :class="{
+                                        'app-tab--active': isActive,
+                                        'inbox-button--ring': inboxBellRinging,
+                                    }"
+                                    @click="navigate"
+                                >
+                                    <span class="inbox-button__bell" aria-hidden="true">
+                                        <img src="./media/bell.svg" class="icon inbox-button__bell-icon" alt="" />
+                                        <span v-if="inboxUnreadCount" class="inbox-button__dot" aria-hidden="true"></span>
+                                    </span>
+                                    Inbox
+                                </button>
+                            </router-link>
+                            <router-link to="/contacts" custom v-slot="{ navigate, isActive }">
+                                <button
+                                    type="button"
+                                    class="app-tab"
+                                    :class="{ 'app-tab--active': isActive }"
+                                    @click="navigate"
+                                >
+                                    Contacts
+                                </button>
+                            </router-link>
+                            <button
+                                type="button"
+                                class="app-tab"
+                                @click="$graffiti.logout($graffitiSession.value)"
+                            >
+                                Log Out
+                            </button>
+                            <span class="app-tabs__indicator" aria-hidden="true"></span>
+                        </nav>
+                    </div>
 
 
-                    <p>router!</p>
+
+                    <!-- <p>router!</p> -->
                     <router-view
                         :session="session"
                         :graffiti="graffiti"
@@ -61,7 +116,7 @@
                         @change-nav-stack="changeNavStack"
                     >
                     </router-view>
-                    <p>router!</p>
+                    <!-- <p>router!</p> -->
                 </template>
 
             </main>

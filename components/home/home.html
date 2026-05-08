@@ -10,32 +10,40 @@
             :appName="appName"
             :toggleNew="toggleNew"
             :contacts="contacts"
+            :sidebar-folder-channel="sidebarFolderChannel"
             v-if="newObject"
         ></new-object-sidebar>
 
 
-        <folder-sidebar
-            :openChat="openChat"
-            :openChatChannel="openChatChannel"
-            :allObjects="allObjects"
-            :folderNavStack="folderNavStack"
-            :folderUpdates="folderUpdates"
-            :sidebarFolderChannel="sidebarFolderChannel"
-            :folderBack="folderBack"
-            :folders="folders"
-            :session="session"
-            :graffiti="graffiti"
-            @changeNavStack="$emit('changeNavStack', $event)"
-            @changeChatChannel="$emit('changeChatChannel', $event)"
-            v-else-if="sidebarFolderChannel"
-        ></folder-sidebar>
+        <transition name="sidebar-folder" mode="out-in">
+            <folder-sidebar
+                v-if="!newObject && sidebarFolderChannel"
+                :key="`folder:${sidebarFolderChannel}`"
+                :openChat="openChat"
+                :openChatChannel="openChatChannel"
+                :allObjects="allObjects"
+                :folderNavStack="folderNavStack"
+                :folderUpdates="folderUpdates"
+                :sidebarFolderChannel="sidebarFolderChannel"
+                :folderBack="folderBack"
+                :folders="folders"
+                :session="session"
+                :graffiti="graffiti"
+                :contacts="contacts"
+                @changeNavStack="$emit('changeNavStack', $event)"
+                @changeChatChannel="$emit('changeChatChannel', $event)"
+            ></folder-sidebar>
 
-        <root-sidebar
-            :allObjects="root"
-            :openChatChannel="openChatChannel"
-            :openObjectFromRoot="openObjectFromRoot"
-            v-else
-        ></root-sidebar>
+            <root-sidebar
+                v-else-if="!newObject"
+                key="root"
+                :allObjects="root"
+                :openChatChannel="openChatChannel"
+                :openObjectFromRoot="openObjectFromRoot"
+                :contacts="contacts"
+                :session="session"
+            ></root-sidebar>
+        </transition>
         <button @click="toggleNew">{{newObject ? "Cancel" : "New"}}</button>
     </div>
 
@@ -49,6 +57,7 @@
         :session="session"
         :graffiti="graffiti"
         :appName="appName"
+        :contacts="contacts"
         :folderNavStack="folderNavStack"
         :allObjects="allObjects"
         :openChat="openChat"

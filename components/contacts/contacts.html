@@ -1,11 +1,82 @@
 <div id="contacts">
-    <h1>Contacts</h1>
-    <ul>
-        <li v-for="contact of curContacts">
-            <router-link :to="`/contacts/${contact.value?.handle}`">
-                {{contact.value?.username}}
+    <div class="contacts-header">
+        <button
+            type="button"
+            class="contacts-add-contact-btn"
+            @click="showAddContactForm = !showAddContactForm"
+        >
+            {{ showAddContactForm ? "Cancel" : "Add contact" }}
+        </button>
+    </div>
+    <form
+        v-if="showAddContactForm"
+        class="contacts-add-form"
+        @submit.prevent="createContact"
+    >
+        <label class="contacts-add-form__field">
+            <span>Graffiti handle</span>
+            <input
+                v-model="newContactHandle"
+                type="text"
+                name="contact-handle"
+                autocomplete="off"
+                placeholder="e.g. alice"
+                class="contacts-add-form__handle-input"
+                :class="{
+                    'contacts-add-form__handle-input--shake': shakeHandleInput,
+                    'contacts-add-form__handle-input--error': handleError,
+                }"
+                :aria-invalid="handleError"
+                :aria-describedby="handleError ? 'contacts-add-handle-error' : undefined"
+                @animationend="clearHandleShakeAnimation"
+                required
+            />
+            <p
+                v-if="handleError"
+                id="contacts-add-handle-error"
+                class="contacts-add-form__handle-error"
+                role="alert"
+            >
+                This graffiti handle was not found. Please try again.
+            </p>
+        </label>
+        <label class="contacts-add-form__field">
+            <span>Display name <small>(optional)</small></span>
+            <input
+                v-model="newContactUsername"
+                type="text"
+                name="contact-display-name"
+                autocomplete="off"
+                placeholder="Defaults to handle"
+            />
+        </label>
+        <p v-if="contactFormError" class="contacts-form-error" role="alert">
+            {{ contactFormError }}
+        </p>
+        <button type="submit" :disabled="contactFormSubmitting">
+            {{ contactFormSubmitting ? "Adding…" : "Save contact" }}
+        </button>
+    </form>
+    <ul v-if="curContacts.length" class="contacts-list">
+        <li
+            v-for="contact of curContacts"
+            :key="contact.value?.actorId ?? contact.value?.handle"
+            class="contacts-list__item"
+        >
+            <router-link
+                class="contacts-list__link"
+                :to="`/contacts/${contact.value?.handle}`"
+            >
+                <span class="contacts-list__avatar" aria-hidden="true">{{ contactInitials(contact) }}</span>
+                <span class="contacts-list__meta">
+                    <span class="contacts-list__name">{{
+                        contact.value?.username
+                    }}</span>
+                    <span class="contacts-list__handle">{{ contact.value?.handle }}.actor.graffiti</span>
+                </span>
             </router-link>
         </li>
     </ul>
+    <p v-else class="contacts-empty">No contacts yet. Add someone above.</p>
 
 </div>

@@ -1,8 +1,12 @@
 <ul id="root-sidebar">
     <li v-for="obj of allObjects" :key="obj.value.channel">
-        <button type="button" @click="openObjectFromRoot(obj)">
-        <!-- <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
-        <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else> -->
+        <button
+            type="button"
+            @click="openFromRoot(obj)"
+            :class="{ 'sidebar-folder-opening': openingChannel === obj.value.channel }"
+        >
+        <img src="./media/folder.svg" alt="" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
+        <span v-else class="sidebar-list__avatar" aria-hidden="true">{{ objectInitials(obj) }}</span>
             {{obj.value.title}}
         </button>
     </li>

@@ -1,14 +1,58 @@
 <div class="chat-panel">
-    <div class="chat-panel-heading">
-        <h2>{{['Chat', 'Group'].includes(openChat?.value?.type)? openChat?.value?.title: ''}}</h2>
-        <button
-            v-if="folderNavStack.length"
-            type="button"
-            class="chat-panel-back"
-            @click="folderBack"
-        >← Back</button>
+    <div v-if="hasOpenChat" class="chat-panel-heading">
+        <h1 class="chat-panel-title">{{ openChat?.value?.title }}</h1>
+        <div class="chat-panel-heading-actions">
+            <details
+                ref="participantsDetailsRef"
+                class="chat-participants"
+                @toggle="onParticipantsToggle"
+            >
+                <summary class="chat-participants__summary">
+                    Participants ({{ participants.length }})
+                </summary>
+                <ul class="chat-participants__list" aria-label="Chat participants">
+                    <li v-for="p of participants" :key="p.actor" class="chat-participants__item">
+                        <span v-if="p.isSelf" class="chat-participants__self">You</span>
+                        <router-link
+                            v-else-if="p.hasContact"
+                            class="chat-participants__link"
+                            :to="`/contacts/${p.contactHandle}`"
+                        >
+                            {{ p.label }}
+                        </router-link>
+                        <button
+                            v-else
+                            type="button"
+                            class="chat-participants__button"
+                            @click="promptCreateContactForActor(p.actor)"
+                        >
+                            <span v-if="p.label">{{ p.label }}</span>
+                            <graffiti-actor-to-handle v-else :actor="p.actor"></graffiti-actor-to-handle>
+                        </button>
+                    </li>
+                </ul>
+            </details>
+            <button
+                v-if="folderNavStack.length"
+                type="button"
+                class="chat-panel-back"
+                @click="folderBack"
+            >
+                ← Back
+            </button>
+            <object-menu
+                :object-channel="openChatChannel"
+                :folders="folders"
+                :folder-updates="folderUpdates"
+                :session="session"
+                :all-objects="allObjects"
+                :graffiti="graffiti"
+                :folderBack="folderBack"
+                :folderNavStack="folderNavStack"
+            ></object-menu>
+        </div>
     </div>
-    <div v-if="['Chat', 'Group'].includes(openChat?.value?.type)" class="chat-panel-body">
+    <div v-if="hasOpenChat" class="chat-panel-body">
         <!-- <div class="chat-folder-actions">
             <add-to-folder-menu
                 :object-channel="openChatChannel"
@@ -24,30 +68,59 @@
                 :graffiti="graffiti"
             ></remove-from-folder-menu>
         </div> -->
-        <object-menu
-            :object-channel="openChatChannel"
-            :folders="folders"
-            :folder-updates="folderUpdates"
-            :session="session"
-            :all-objects="allObjects"
-            :graffiti="graffiti"
-            :folderBack="folderBack"
-            :folderNavStack="folderNavStack"
-        ></object-menu>
-        <div class="chat-message-thread">
+
+        <div
+            ref="messageThreadRef"
+            class="chat-message-thread"
+            @scroll="onMessageThreadScroll"
+        >
             <div
-                v-for="message of messages"
-                :key="message.actor + '-' + message.value.published + '-' + message.value.content"
+                v-for="message of displayedMessages"
+                :key="message.url || message.__tempId || (message.actor + '-' + message.value.published + '-' + message.value.content + '-' + (message.value.tombstone ? 't' : ''))"
                 class="chat-message"
                 :class="{ 'chat-message--own': isOwnMessage(message) }"
             >
-                <div class="chat-message-meta">
-                    <strong>
-                        <graffiti-actor-to-handle :actor="message.actor">
-                        </graffiti-actor-to-handle>
-                    </strong>
+                <div
+                    class="chat-message-body"
+                    :class="{
+                        'chat-message-body--tombstone': isTombstone(message),
+                        'chat-message-body--pending': isPendingMessage(message),
+                        'chat-message-body--failed': isFailedMessage(message),
+                        'chat-message-body--just-sent': message.__justSent,
+                    }"
+                    role="button"
+                    tabindex="0"
+                    @click="toggleMessageExpanded(message)"
+                    @keydown.enter.prevent="toggleMessageExpanded(message)"
+                    @keydown.space.prevent="toggleMessageExpanded(message)"
+                >
+                    <template v-if="isTombstone(message)">This message was deleted.</template>
+                    <template v-else>{{ message.value.content }}</template>
                 </div>
-                <div class="chat-message-body">{{ message.value.content }}</div>
+                <div v-if="isMessageExpanded(message)" class="chat-message-details">
+                    <span class="chat-message-details__time">
+                        {{ formatMessageTime(message.value.published) }}
+                    </span>
+                    <template v-if="!isOwnMessage(message)">
+                        <span class="chat-message-details__dot" aria-hidden="true">·</span>
+                        <span v-if="messageDisplayName(message.actor)" class="chat-message-details__name">
+                            {{ messageDisplayName(message.actor) }}
+                        </span>
+                        <span v-else class="chat-message-details__handle">
+                            <graffiti-actor-to-handle :actor="message.actor"></graffiti-actor-to-handle>
+                        </span>
+                    </template>
+                    <template v-if="isOwnMessage(message) && !isTombstone(message)">
+                        <span class="chat-message-details__dot" aria-hidden="true">·</span>
+                        <button
+                            type="button"
+                            class="chat-message-details__action"
+                            @click.stop="withdrawMessage(message)"
+                        >
+                            Delete
+                        </button>
+                    </template>
+                </div>
             </div>
         </div>
         <form

@@ -15,4 +15,27 @@
 #home{
     display: flex;
     flex-direction: row;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Folder open animation: expand + fade, max 400ms. */
+.sidebar-folder-enter-active,
+.sidebar-folder-leave-active {
+  transition: opacity 240ms ease, transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sidebar-folder-enter-from,
+.sidebar-folder-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+}
+
+#sidebar #root-sidebar button,
+#sidebar ul.folder-sidebar-list button {
+  transition: background 0.15s ease, color 0.15s ease, transform 160ms ease-out;
+}
+
+#sidebar .sidebar-folder-opening {
+  transform: scale(1.015);
 }

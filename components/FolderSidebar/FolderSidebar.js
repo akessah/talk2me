@@ -1,5 +1,6 @@
-import { ref, toRefs, computed } from "vue";
+import { toRefs, computed, ref } from "vue";
 import ObjectMenu from "../ObjectMenu/ObjectMenu.js";
+import { sidebarObjectInitials } from "../objectInitials.js";
 
 export default {
   props: {
@@ -13,9 +14,30 @@ export default {
     folders: { type: Array, required: true},
     session: { type: Object, required: true },
     graffiti: { type: Object, required: true },
+    contacts: { type: Array, default: () => [] },
 
   },
   setup(props, { emit }) {
+    const openingChannel = ref("");
+    function titleForChannel(ch) {
+        if (!ch) return "";
+        const obj = props.allObjects.find((o) => o.value.channel === ch);
+        return obj?.value?.title ?? ch;
+    }
+
+    const breadcrumbText = computed(() => {
+        const stack = Array.isArray(props.folderNavStack) ? props.folderNavStack : [];
+        const current = props.sidebarFolderChannel || "";
+        const parts = ["Root"];
+        for (const ch of stack) {
+            if (ch) parts.push(titleForChannel(ch));
+        }
+        if (current && stack[stack.length - 1] !== current) {
+            parts.push(titleForChannel(current));
+        }
+        return parts.join(" / ");
+    });
+
     function latestFolderUpdatesByPair(updates) {
         const byPair = new Map();
         for (const u of updates || []) {
@@ -77,14 +99,38 @@ export default {
     );
     function openObjectFromFolder(obj) {
         emit('changeNavStack', [...props.folderNavStack, props.openChatChannel])
-		// props.folderNavStack = [...props.folderNavStack, props.openChatChannel];
         emit('changeChatChannel', obj.value.channel)
-		// props.openChatChannel = obj.value.channel;
 	}
+
+    function openFromFolder(obj) {
+        if (obj?.value?.type === "Folder") {
+            const ch = obj?.value?.channel ?? "";
+            if (!ch) return;
+            openingChannel.value = ch;
+            window.setTimeout(() => {
+                openObjectFromFolder(obj);
+                openingChannel.value = "";
+            }, 320);
+            return;
+        }
+        openObjectFromFolder(obj);
+    }
+
+    function objectInitials(obj) {
+        return sidebarObjectInitials(
+            obj,
+            props.contacts,
+            props.session?.actor,
+        );
+    }
+
     return {
-        openObjectFromFolder,
+        openFromFolder,
+        openingChannel,
         openFolder,
         sidebarListTitle,
+        breadcrumbText,
+        objectInitials,
         ...toRefs(props),
     };
   },

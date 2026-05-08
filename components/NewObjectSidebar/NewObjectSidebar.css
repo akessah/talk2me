@@ -44,6 +44,65 @@
   box-shadow: 0 0 0 2px rgba(91, 141, 239, 0.25);
 }
 
+#new-object-sidebar .new-chat-form__handle-field {
+  flex: 1 1 140px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+#new-object-sidebar .new-chat-form__handle-field .new-chat-form__handle-input {
+  width: 100%;
+  /* Column flex parent: global input rule uses flex-grow:1, which applies on the
+     vertical axis here and stretches the field. Keep natural single-line height. */
+  flex: 0 0 auto;
+  align-self: stretch;
+}
+
+#new-object-sidebar
+  .new-chat-form
+  .new-chat-form__handle-input.new-chat-form__handle-input--error,
+#new-object-sidebar
+  .new-chat-form
+  .new-chat-form__handle-input.new-chat-form__handle-input--error:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(232, 93, 93, 0.35);
+}
+
+#new-object-sidebar .new-chat-form__handle-error {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--danger);
+  line-height: 1.35;
+}
+
 #new-object-sidebar form button[type="submit"] {
   flex-shrink: 0;
+}
+
+@keyframes new-chat-handle-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-6px);
+  }
+  40%,
+  80% {
+    transform: translateX(6px);
+  }
+}
+
+#new-object-sidebar .new-chat-form .new-chat-form__handle-input--shake {
+  animation: new-chat-handle-shake 0.45s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #new-object-sidebar .new-chat-form .new-chat-form__handle-input--shake {
+    animation: none;
+  }
 }

@@ -1,4 +1,4 @@
-import { ref, toRefs } from "vue";
+import { ref, toRefs, nextTick, watch } from "vue";
 
 export default {
   props: {
@@ -6,7 +6,9 @@ export default {
     graffiti: { type: Object, required: true },
     appName: { type: String, required: true },
     toggleNew: { type: Function, required: true },
-    contacts: { type: Array, required: true }
+    contacts: { type: Array, required: true },
+    /** When set, new chats/folders are added to this folder (folder channel id). */
+    sidebarFolderChannel: { type: [String, null], default: null },
   },
   setup(props) {
     const newChatName = ref("");
@@ -14,46 +16,103 @@ export default {
     const newGroupName = ref("");
     const otherHandles = ref("");
     const newFolderName = ref("");
+    const handleError = ref(false);
+    const shakeHandleInput = ref(false);
+
+    const HANDLE_SHAKE_MS = 450;
+
+    function clearHandleShakeAnimation() {
+      shakeHandleInput.value = false;
+    }
+
+    async function triggerHandleShake() {
+      shakeHandleInput.value = false;
+      await nextTick();
+      shakeHandleInput.value = true;
+      setTimeout(clearHandleShakeAnimation, HANDLE_SHAKE_MS);
+    }
+
+    watch(otherHandle, () => {
+      handleError.value = false;
+    });
+    // let graffitiActor = useGraffitiHandleToActor(
+    //       `googoo.graffiti.actor`
+    //     ).actor;
 
     function splitHandles(handles) {
       return handles.split(",").map((handle) => handle.trim());
     }
 
-    async function createChat(name, other) {
-      const otherActor = await props.graffiti.handleToActor(
-        `${other}.graffiti.actor`
-      );
-      console.log(props.contacts.find(c => c.value.actor === otherActor))
-      if (props.contacts.find(c => c.value.actor === otherActor) === undefined){
-        console.log('adding contact')
-        console.log(props.session.actor)
-        console.log(typeof otherActor, typeof other)
-        console.log(await props.graffiti.post(
-          {
-            value: {
-              actorId: otherActor,
-              username: other,
-              handle: other,
-              published: Date.now(),
-            },
-            allowed: [],
-            channels: [
-              `${props.session.actor} contacts`,
-              'my contacts'
-            ],
+    async function addObjectToOpenFolder(objectChannel, published) {
+      const target = props.sidebarFolderChannel;
+      if (target == null || target === "") return;
+      await props.graffiti.post(
+        {
+          value: {
+            activity: "Add",
+            obj: objectChannel,
+            target,
+            published,
           },
-          props.session
-        ));
-        console.log('done adding contact')
-      }
+          allowed: [],
+          channels: [`${props.session.actor}/folders`],
+        },
+        props.session,
+      );
+    }
+
+    function findContactByUsername(query) {
+      if (!query) return null;
+      const matches = props.contacts
+        .filter((c) => c?.value?.username === query)
+        .sort((a, b) => (b.value.published ?? 0) - (a.value.published ?? 0));
+      return matches.length > 0 ? matches[0] : null;
+    }
+
+    async function createChat(name, other) {
+      try{
+        let otherActor;
+
+        const contactMatch = findContactByUsername(other);
+        if (contactMatch) {
+          otherActor = contactMatch.value.actorId;
+        } else {
+          otherActor = (await props.graffiti.handleToActor(
+            `${other}.graffiti.actor`
+          ));
+          if (otherActor.actor)
+
+
+          if (props.contacts.find(c => c.value.actor === otherActor.actor) === undefined){
+            console.log(await props.graffiti.post(
+              {
+                value: {
+                  actorId: otherActor,
+                  username: other,
+                  handle: other,
+                  published: Date.now(),
+                },
+                allowed: [],
+                channels: [
+                  `${props.session.actor} contacts`,
+                  'my contacts'
+                ],
+              },
+              props.session
+            ));
+          }
+        }
+      console.log(1)
+      const t = Date.now();
+      const chatChannel = crypto.randomUUID();
       await props.graffiti.post(
         {
           value: {
             activity: "Create",
             type: "Chat",
-            channel: crypto.randomUUID(),
+            channel: chatChannel,
             title: name,
-            published: Date.now(),
+            published: t,
           },
           allowed: [otherActor],
           channels: [
@@ -63,8 +122,102 @@ export default {
         },
         props.session
       );
-      props.toggleNew()
+      await props.graffiti.post(
+        {
+          value: {
+            activity: "Add",
+            type: "Participant",
+            actorId: otherActor,
+            published: Date.now(),
+          },
+          allowed: [otherActor],
+          channels: [
+            chatChannel
+          ],
+        },
+        props.session
+      )
+      await props.graffiti.post(
+        {
+          value: {
+            activity: "Add",
+            type: "Participant",
+            actorId: props.session.actor,
+            published: Date.now(),
+          },
+          allowed: [otherActor],
+          channels: [
+            chatChannel
+          ],
+        },
+        props.session
+      )
+      console.log(2)
+      await addObjectToOpenFolder(chatChannel, t + 1);
+      console.log(3)
+      handleError.value = false;
+      props.toggleNew();
+      console.log(4)
+    }catch(e){
+      console.log(e)
+      handleError.value=true;
+      triggerHandleShake();
+      return;
     }
+    }
+
+    // watch(graffitiActor, async (oldActor, otherActor) => {
+    //   console.log('watch')
+    //   if(otherActor === undefined || otherActor===""){
+    //     console.log('went to default or waiting')
+    //     return
+    //   }
+    //   if(otherActor===null){
+    //     console.log('actor not found')
+    //     handleError.value=true;
+    //     return;
+    //   }
+    //   console.log('actor found')
+    //     // const otherActor = graffitiActor.value;
+
+
+    //   if (props.contacts.find(c => c.value.actor === otherActor) === undefined){
+    //     console.log(await props.graffiti.post(
+    //       {
+    //         value: {
+    //           actorId: otherActor,
+    //           username: other,
+    //           handle: other,
+    //           published: Date.now(),
+    //         },
+    //         allowed: [],
+    //         channels: [
+    //           `${props.session.actor} contacts`,
+    //           'my contacts'
+    //         ],
+    //       },
+    //       props.session
+    //     ));
+    //   }
+    //   await props.graffiti.post(
+    //     {
+    //       value: {
+    //         activity: "Create",
+    //         type: "Chat",
+    //         channel: crypto.randomUUID(),
+    //         title: name,
+    //         published: Date.now(),
+    //       },
+    //       allowed: [otherActor],
+    //       channels: [
+    //         `${props.appName} chats`,
+    //         `${props.session.actor}/chats`,
+    //       ],
+    //     },
+    //     props.session
+    //   );
+    //   props.toggleNew()
+    // })
 
     async function createGroup(name, others) {
       others = splitHandles(others);
@@ -123,21 +276,24 @@ export default {
     }
 
     async function createFolder(name) {
+      const t = Date.now();
+      const folderChannel = crypto.randomUUID();
       await props.graffiti.post(
         {
           value: {
             activity: "Create",
             type: "Folder",
-            channel: crypto.randomUUID(),
+            channel: folderChannel,
             title: name,
-            published: Date.now(),
+            published: t,
           },
           allowed: [],
           channels: [`${props.session.actor}/folders`],
         },
         props.session
       );
-      props.toggleNew()
+      await addObjectToOpenFolder(folderChannel, t + 1);
+      props.toggleNew();
     }
 
     return {
@@ -150,6 +306,10 @@ export default {
       newGroupName,
       otherHandles,
       otherHandle,
+      handleError,
+      shakeHandleInput,
+      clearHandleShakeAnimation,
+      // graffitiActor
     };
   },
   template: await fetch(new URL("./NewObjectSidebar.html", import.meta.url)).then((r) =>
