@@ -51,12 +51,14 @@ export default {
     contacts: { type: Array, default: () => [] },
     folderNavStack: { type: Array, required: true},
     folderBack: { type: Function, required: true},
+    chatDeletionCutoffs: { type: Object, default: () => new Map() },
   },
   setup(props) {
     const { objects: messages } = useGraffitiDiscover(
         () => [props.openChatChannel],
         messageDiscoverOpts,
-        props.session
+        props.session,
+        true,
     );
 
     const { objects: participantUpdates } = useGraffitiDiscover(
@@ -319,6 +321,15 @@ export default {
       const filteredOpts = opts.filter((m) => !hasRealMessageForOptimistic(m));
       const combined = [...list, ...filteredOpts];
       combined.sort((a, b) => (a?.value?.published ?? 0) - (b?.value?.published ?? 0));
+
+      const cuts = props.chatDeletionCutoffs;
+      const cutoff =
+        cuts && typeof cuts.get === "function"
+          ? cuts.get(props.openChatChannel) ?? 0
+          : 0;
+      if (cutoff > 0) {
+        return combined.filter((m) => (m?.value?.published ?? 0) > cutoff);
+      }
       return combined;
     });
 

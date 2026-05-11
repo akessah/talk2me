@@ -18,6 +18,7 @@ export default {
     const newFolderName = ref("");
     const handleError = ref(false);
     const shakeHandleInput = ref(false);
+    const submitting = ref(false);
 
     const HANDLE_SHAKE_MS = 450;
 
@@ -70,6 +71,7 @@ export default {
     }
 
     async function createChat(name, other) {
+      submitting.value = true;
       try{
         let otherActor;
 
@@ -163,6 +165,8 @@ export default {
       handleError.value=true;
       triggerHandleShake();
       return;
+    } finally {
+      submitting.value = false;
     }
     }
 
@@ -220,80 +224,90 @@ export default {
     // })
 
     async function createGroup(name, others) {
-      others = splitHandles(others);
-      others = await Promise.all(
-            others.map(async (handle) => {
-              const actor = await props.graffiti.handleToActor(
-                `${handle}.graffiti.actor`
-              );
-              return {handle, actor};
-            })
-          );
-      for (const other of others){
-          if (props.contacts.find(c => c.value.actor === otherActor) === undefined){
-            await props.graffiti.post(
-              {
-                value: {
-                  actor: other.actor,
-                  username: other.handle,
-                  handle: other.handle,
-                  published: Date.now(),
-                },
-                allowed: [],
-                channels: [
-                  `${props.session.actor} contacts`
-                ],
-              },
-              props.session
+      submitting.value = true;
+      try {
+        others = splitHandles(others);
+        others = await Promise.all(
+              others.map(async (handle) => {
+                const actor = await props.graffiti.handleToActor(
+                  `${handle}.graffiti.actor`
+                );
+                return {handle, actor};
+              })
             );
-          }
-      }
-      await props.graffiti.post(
-        {
-          value: {
-            activity: "Create",
-            type: "Group",
-            channel: crypto.randomUUID(),
-            title: name,
-            published: Date.now(),
-          },
-          allowed: await Promise.all(
-            others.map(async (handle) => {
-              const actor = await props.graffiti.handleToActor(
-                `${handle}.graffiti.actor`
+        for (const other of others){
+            if (props.contacts.find(c => c.value.actor === otherActor) === undefined){
+              await props.graffiti.post(
+                {
+                  value: {
+                    actor: other.actor,
+                    username: other.handle,
+                    handle: other.handle,
+                    published: Date.now(),
+                  },
+                  allowed: [],
+                  channels: [
+                    `${props.session.actor} contacts`
+                  ],
+                },
+                props.session
               );
-              return actor;
-            })
-          ),
-          channels: [
-            `${props.appName} groups`,
-            `${props.session.actor}/groups`,
-          ],
-        },
-        props.session
-      );
-      props.toggleNew()
+            }
+        }
+        await props.graffiti.post(
+          {
+            value: {
+              activity: "Create",
+              type: "Group",
+              channel: crypto.randomUUID(),
+              title: name,
+              published: Date.now(),
+            },
+            allowed: await Promise.all(
+              others.map(async (handle) => {
+                const actor = await props.graffiti.handleToActor(
+                  `${handle}.graffiti.actor`
+                );
+                return actor;
+              })
+            ),
+            channels: [
+              `${props.appName} groups`,
+              `${props.session.actor}/groups`,
+            ],
+          },
+          props.session
+        );
+        props.toggleNew()
+      } finally {
+        submitting.value = false;
+      }
     }
 
     async function createFolder(name) {
-      const t = Date.now();
-      const folderChannel = crypto.randomUUID();
-      await props.graffiti.post(
-        {
-          value: {
-            activity: "Create",
-            type: "Folder",
-            channel: folderChannel,
-            title: name,
-            published: t,
+      submitting.value = true;
+      try {
+        const t = Date.now();
+        const folderChannel = crypto.randomUUID();
+        await props.graffiti.post(
+          {
+            value: {
+              activity: "Create",
+              type: "Folder",
+              channel: folderChannel,
+              title: name,
+              published: t,
+            },
+            allowed: [],
+            channels: [`${props.session.actor}/folders`],
           },
-          allowed: [],
-          channels: [`${props.session.actor}/folders`],
-        },
-        props.session
-      );
-      await addObjectToOpenFolder(folderChannel, t + 1);
-      props.toggleNew();
+          props.session
+        );
+        await addObjectToOpenFolder(folderChannel, t + 1);
+        props.toggleNew();
+      } finally {
+        submitting.value = false;
+      }
     }
 
     return {
@@ -309,6 +323,7 @@ export default {
       handleError,
       shakeHandleInput,
       clearHandleShakeAnimation,
+      submitting,
       // graffitiActor
     };
   },

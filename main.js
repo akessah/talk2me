@@ -112,6 +112,19 @@ const messageDiscoverOpts = {
   },
 };
 
+const chatDeletionDiscoverOpts = {
+  properties: {
+    value: {
+      required: ["activity", "chatChannel", "published"],
+      properties: {
+        activity: { const: "DeleteChat" },
+        chatChannel: { type: "string" },
+        published: { type: "number" },
+      },
+    },
+  },
+};
+
 const notificationDiscoverOpts = {
   properties: {
     value: {
@@ -164,12 +177,14 @@ createApp({
         const { objects: chats } = useGraffitiDiscover(
             [`${appName} chats`],
             chatDiscoverOpts,
-            session
+            session,
+            true,
         );
         const { objects: groups } = useGraffitiDiscover(
             [`${appName} groups`],
             groupDiscoverOpts,
-            session
+            session,
+            true,
         );
         const { objects: folders } = useGraffitiDiscover(
             () => (session.value ? [`${session.value.actor}/folders`] : []),
@@ -255,6 +270,75 @@ createApp({
           true,
         );
 
+        const { objects: chatDeletions } = useGraffitiDiscover(
+          () =>
+            session.value?.actor
+              ? [`${session.value.actor}/chat-deletions`]
+              : [],
+          chatDeletionDiscoverOpts,
+          () => session.value,
+          true,
+        );
+
+        const chatDeletionCutoffs = computed(() => {
+          const m = new Map();
+          const list = Array.isArray(chatDeletions.value)
+            ? chatDeletions.value
+            : [];
+          for (const d of list) {
+            const ch = d?.value?.chatChannel;
+            const ts = d?.value?.published ?? 0;
+            if (!ch) continue;
+            const cur = m.get(ch) ?? 0;
+            if (ts > cur) m.set(ch, ts);
+          }
+          return m;
+        });
+
+        const hiddenChatChannels = computed(() => {
+          const hidden = new Set();
+          const cuts = chatDeletionCutoffs.value;
+          const notifList = Array.isArray(notifications.value)
+            ? notifications.value
+            : [];
+
+          // Soft-deletion: hide chats whose deletion cutoff has not been
+          // overridden by a later notification.
+          for (const [ch, cutoff] of cuts) {
+            let hasNewer = false;
+            for (const n of notifList) {
+              if (n?.value?.chatChannel !== ch) continue;
+              if ((n?.value?.messagePublished ?? 0) > cutoff) {
+                hasNewer = true;
+                break;
+              }
+            }
+            if (!hasNewer) hidden.add(ch);
+          }
+
+          // Silent: hide chats/groups created by someone else that have not
+          // received any message yet (i.e., no notification has ever arrived
+          // for that channel). Folders, and chats created by the current
+          // user, are unaffected.
+          const sessionActor = session.value?.actor;
+          const chatsWithNotifs = new Set();
+          for (const n of notifList) {
+            const ch = n?.value?.chatChannel;
+            if (ch) chatsWithNotifs.add(ch);
+          }
+          for (const obj of allObjects.value) {
+            const type = obj?.value?.type;
+            if (type !== "Chat" && type !== "Group") continue;
+            const ch = obj?.value?.channel;
+            if (!ch) continue;
+            if (obj.actor && obj.actor === sessionActor) continue;
+            if (chatsWithNotifs.has(ch)) continue;
+            hidden.add(ch);
+          }
+
+          return hidden;
+        });
+
         const inboxUnreadCount = computed(() => {
           void lastReadTick.value;
           const actor = session.value?.actor;
@@ -333,6 +417,8 @@ createApp({
             openChat,
             deleting,
             folderUpdates,
+            chatDeletionCutoffs,
+            hiddenChatChannels,
             inboxUnreadCount,
             inboxBellRinging,
             updateTabsIndicator,

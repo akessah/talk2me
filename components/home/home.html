@@ -30,6 +30,7 @@
                 :session="session"
                 :graffiti="graffiti"
                 :contacts="contacts"
+                :hiddenChatChannels="hiddenChatChannels"
                 @changeNavStack="$emit('changeNavStack', $event)"
                 @changeChatChannel="$emit('changeChatChannel', $event)"
             ></folder-sidebar>
@@ -63,6 +64,7 @@
         :openChat="openChat"
         :folderBack="folderBack"
         :folderUpdates="folderUpdates"
+        :chatDeletionCutoffs="chatDeletionCutoffs"
 
     ></chat>
 

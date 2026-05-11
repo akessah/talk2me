@@ -25,17 +25,29 @@
                 This graffiti handle was not found. Please try again.
             </p>
         </div>
-        <button type="submit">Create Chat</button>
+        <button
+            type="submit"
+            :disabled="submitting || !newChatName.trim() || !otherHandle.trim()"
+        >
+            Create Chat
+        </button>
     </form>
     <h3>Create Group</h3>
     <form @submit.prevent="createGroup(newGroupName, otherHandles)">
         <input type="text" v-model="newGroupName" placeholder="Group Name" disabled/>
         <input type="text" v-model="otherHandles" placeholder="Graffiti Handles (use commas)" disabled/>
-        <button type="submit" disabled>Create Group</button>
+        <button
+            type="submit"
+            :disabled="submitting || !newGroupName.trim() || !otherHandles.trim()"
+        >
+            Create Group
+        </button>
     </form>
     <h3>Create Folder</h3>
     <form @submit.prevent="createFolder(newFolderName)">
         <input type="text" v-model="newFolderName" placeholder="Folder Name"/>
-        <button type="submit">Create Folder</button>
+        <button type="submit" :disabled="submitting || !newFolderName.trim()">
+            Create Folder
+        </button>
     </form>
 </div>

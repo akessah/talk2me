@@ -64,12 +64,27 @@
                 </button>
             </li>
 
-            <li class="object-menu__item">
+            <li
+                class="object-menu__item"
+                v-if="objectChannel && objectType === 'Folder'"
+            >
+                <button
+                    type="button"
+                    class="object-menu__button object-menu__button--danger"
+                    @click="emptyAndDeleteFolder"
+                >
+                    Empty and delete
+                </button>
+            </li>
+
+            <li
+                class="object-menu__item"
+                v-if="objectChannel && (objectType === 'Chat' || objectType === 'Group' || objectType === 'Folder')"
+            >
                 <button
                     type="button"
                     class="object-menu__button object-menu__button--danger"
                     @click="deleteObject"
-                    disabled
                 >
                     Delete
                 </button>

@@ -100,22 +100,42 @@ export default {
     });
 
     async function removeFromFolder() {
-        const target = parentFolderChannel.value;
-        if (!props.objectChannel || !target) return;
-        await props.graffiti.post(
-        {
-            value: {
-            activity: "Remove",
-            obj: props.objectChannel,
-            target,
-            published: Date.now(),
-            },
-            allowed: [],
-            channels: [`${props.session.actor}/folders`],
-        },
-        props.session
-        );
-        folderBack();
+        const current = parentFolderChannel.value;
+        if (!props.objectChannel || !current) return;
+        const folderBackFn = props.folderBack;
+
+        const updates = Array.isArray(props.folderUpdates)
+            ? props.folderUpdates
+            : [];
+        const grandparent = currentFolderForObject(updates, current);
+
+        if (grandparent) {
+            await addObjectExclusiveToFolder({
+                graffiti: props.graffiti,
+                session: props.session,
+                objectChannel: props.objectChannel,
+                targetFolderChannel: grandparent,
+                folderUpdates: updates,
+            });
+        } else {
+            await props.graffiti.post(
+                {
+                    value: {
+                        activity: "Remove",
+                        obj: props.objectChannel,
+                        target: current,
+                        published: Date.now(),
+                    },
+                    allowed: [],
+                    channels: [`${props.session.actor}/folders`],
+                },
+                props.session
+            );
+        }
+
+        if (typeof folderBackFn === "function") {
+            folderBackFn();
+        }
     }
 
     async function createFolderAndMove() {
@@ -192,6 +212,18 @@ export default {
       return targets;
     }
 
+    function currentFolderForObject(updates, objectChannel) {
+      const byPair = latestFolderUpdatesByPair(updates);
+      let best = null;
+      for (const u of byPair.values()) {
+        if (u.value.obj !== objectChannel || u.value.activity !== "Add") continue;
+        if (!best || u.value.published > best.value.published) {
+          best = u;
+        }
+      }
+      return best ? best.value.target : null;
+    }
+
     async function addObjectExclusiveToFolder({
       graffiti,
       session,
@@ -245,9 +277,217 @@ export default {
       );
     }
 
-    async function deleteObject() {
-      await props.graffiti.delete
+    async function postChatDeletion(chatChannel) {
+      await props.graffiti.post(
+        {
+          value: {
+            activity: "DeleteChat",
+            chatChannel,
+            published: Date.now(),
+          },
+          allowed: [],
+          channels: [`${props.session.actor}/chat-deletions`],
+        },
+        props.session
+      );
+    }
 
+    async function postFolderRemove(objChannel, targetFolderChannel) {
+      await props.graffiti.post(
+        {
+          value: {
+            activity: "Remove",
+            obj: objChannel,
+            target: targetFolderChannel,
+            published: Date.now(),
+          },
+          allowed: [],
+          channels: [`${props.session.actor}/folders`],
+        },
+        props.session
+      );
+    }
+
+    async function recursivelyDeleteFolder(folderChannel) {
+      const updates = Array.isArray(props.folderUpdates)
+        ? props.folderUpdates
+        : [];
+      const allObjs = Array.isArray(props.allObjects) ? props.allObjects : [];
+
+      // Snapshot the children up front so concurrent updates don't perturb
+      // the iteration.
+      const childrenSnapshot = [];
+      for (const obj of allObjs) {
+        const ch = obj?.value?.channel;
+        if (!ch) continue;
+        if (currentFolderForObject(updates, ch) !== folderChannel) continue;
+        childrenSnapshot.push(obj);
+      }
+
+      for (const obj of childrenSnapshot) {
+        const ch = obj.value.channel;
+        const type = obj.value.type;
+        if (type === "Folder") {
+          await recursivelyDeleteFolder(ch);
+        } else if (type === "Chat" || type === "Group") {
+          try {
+            await postChatDeletion(ch);
+            await postFolderRemove(ch, folderChannel);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }
+
+      const folderObj = allObjs.find(
+        (o) => o?.value?.channel === folderChannel
+      );
+      if (folderObj) {
+        try {
+          await props.graffiti.delete(folderObj, props.session);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
+    async function emptyAndDeleteFolder() {
+      if (!props.objectChannel) return;
+      if (objectType.value !== "Folder") return;
+
+      const folderChannel = props.objectChannel;
+      const parent = parentFolderChannel.value || "";
+      const folderBackFn = props.folderBack;
+
+      const destinationLabel = parent
+        ? `"${parentFolderTitle.value}"`
+        : "the root";
+
+      const confirmed = window.confirm(
+        `Empty and delete this folder?\n\n` +
+          `Everything inside this folder will be moved to ${destinationLabel}, ` +
+          `then the folder will be deleted.\n\n` +
+          `Other participants are unaffected.`
+      );
+      if (!confirmed) return;
+
+      try {
+        const updates = Array.isArray(props.folderUpdates)
+          ? props.folderUpdates
+          : [];
+        const allObjs = Array.isArray(props.allObjects)
+          ? props.allObjects
+          : [];
+
+        const childChannels = [];
+        for (const obj of allObjs) {
+          const ch = obj?.value?.channel;
+          if (!ch) continue;
+          if (currentFolderForObject(updates, ch) !== folderChannel) continue;
+          childChannels.push(ch);
+        }
+
+        for (const ch of childChannels) {
+          if (parent) {
+            await addObjectExclusiveToFolder({
+              graffiti: props.graffiti,
+              session: props.session,
+              objectChannel: ch,
+              targetFolderChannel: parent,
+              folderUpdates: updates,
+            });
+          } else {
+            await postFolderRemove(ch, folderChannel);
+          }
+        }
+
+        // Detach this folder from its own parent (if any) before hard-delete.
+        if (parent) {
+          await postFolderRemove(folderChannel, parent);
+        }
+
+        const folderObj = allObjs.find(
+          (o) => o?.value?.channel === folderChannel
+        );
+        if (folderObj) {
+          try {
+            await props.graffiti.delete(folderObj, props.session);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+        return;
+      }
+
+      menuOpen.value = false;
+      addMenuOpen.value = false;
+
+      if (typeof folderBackFn === "function") {
+        folderBackFn();
+      }
+    }
+
+    async function deleteObject() {
+      if (!props.objectChannel) return;
+      const type = objectType.value;
+      const folderBackFn = props.folderBack;
+
+      if (type === "Chat" || type === "Group") {
+        const confirmed = window.confirm(
+          "Delete this chat?\n\n" +
+            "All messages up to now will be hidden from your view. " +
+            "If another participant sends a new message, the chat will " +
+            "reappear from that message onward.\n\n" +
+            "Other participants will still see the chat and its history."
+        );
+        if (!confirmed) return;
+
+        try {
+          await postChatDeletion(props.objectChannel);
+        } catch (e) {
+          console.error(e);
+          return;
+        }
+      } else if (type === "Folder") {
+        const confirmed = window.confirm(
+          "Delete this folder?\n\n" +
+            "This will permanently delete the folder and any sub-folders " +
+            "inside it. Chats and groups inside (including those nested in " +
+            "sub-folders) will be hidden from your view the same way " +
+            "deleting a chat does — their messages up to now will be " +
+            "hidden, and they will reappear at the root level if another " +
+            "participant sends a new message.\n\n" +
+            "Other participants will still see all of those chats and " +
+            "their history."
+        );
+        if (!confirmed) return;
+
+        try {
+          // Detach the top-level folder from its parent (if any) so any
+          // stale Add records don't dangle. Do this before hard-delete
+          // so the folder is gone from the parent's view cleanly.
+          const parent = parentFolderChannel.value;
+          if (parent) {
+            await postFolderRemove(props.objectChannel, parent);
+          }
+
+          await recursivelyDeleteFolder(props.objectChannel);
+        } catch (e) {
+          console.error(e);
+          return;
+        }
+      } else {
+        return;
+      }
+
+      menuOpen.value = false;
+      addMenuOpen.value = false;
+
+      if (typeof folderBackFn === "function") {
+        folderBackFn();
+      }
     }
 
 
@@ -264,6 +504,8 @@ export default {
         menuButtonRef,
         menuListRef,
         objectType,
+        deleteObject,
+        emptyAndDeleteFolder,
     };
   },
   template: await fetch(new URL("./ObjectMenu.html", import.meta.url)).then((r) =>

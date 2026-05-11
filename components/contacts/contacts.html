@@ -53,7 +53,10 @@
         <p v-if="contactFormError" class="contacts-form-error" role="alert">
             {{ contactFormError }}
         </p>
-        <button type="submit" :disabled="contactFormSubmitting">
+        <button
+            type="submit"
+            :disabled="contactFormSubmitting || !newContactHandle.trim()"
+        >
             {{ contactFormSubmitting ? "Adding…" : "Save contact" }}
         </button>
     </form>

@@ -15,6 +15,7 @@ export default {
     session: { type: Object, required: true },
     graffiti: { type: Object, required: true },
     contacts: { type: Array, default: () => [] },
+    hiddenChatChannels: { type: Object, default: () => new Set() },
 
   },
   setup(props, { emit }) {
@@ -93,9 +94,11 @@ export default {
     });
 
     const openFolder = computed(() =>
-        props.allObjects.filter((obj) =>
-            getInFolder.value.includes(obj.value.channel)
-        )
+        props.allObjects.filter((obj) => {
+            if (!getInFolder.value.includes(obj.value.channel)) return false;
+            if (props.hiddenChatChannels && props.hiddenChatChannels.has(obj.value.channel)) return false;
+            return true;
+        })
     );
     function openObjectFromFolder(obj) {
         emit('changeNavStack', [...props.folderNavStack, props.openChatChannel])

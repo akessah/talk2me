@@ -187,7 +187,11 @@ function setup(props, { emit }) {
 
 
   const root = computed(()=>{
-      return props.allObjects.filter(o=> !objectsInFolder.value.has(o.value.channel))
+      return props.allObjects.filter(o => {
+          if (objectsInFolder.value.has(o.value.channel)) return false;
+          if (props.hiddenChatChannels && props.hiddenChatChannels.has(o.value.channel)) return false;
+          return true;
+      });
   })
 
 
@@ -211,7 +215,7 @@ function setup(props, { emit }) {
 
 
 export default async () => ({
-  props: ['graffiti', 'session', 'appName', 'contacts', 'allObjects', 'folders', 'folderNavStack', 'openChat', 'openChatChannel', 'folderUpdates'],
+  props: ['graffiti', 'session', 'appName', 'contacts', 'allObjects', 'folders', 'folderNavStack', 'openChat', 'openChatChannel', 'folderUpdates', 'chatDeletionCutoffs', 'hiddenChatChannels'],
   emits: ['changeChatChannel', 'changeNavStack'],
   setup,
   template: await fetch(new URL("./home.html", import.meta.url)).then((r) =>
