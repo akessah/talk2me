@@ -176,6 +176,14 @@ function setup(props, { emit }) {
 
 	const toggleNew = () => newObject.value = !newObject.value;
 
+	// A chat is "open" (covers the screen on mobile) only when the open
+	// object is an actual chat or group. Folders are treated as sidebar
+	// navigation, not a chat that should hide the sidebar on mobile.
+	const hasOpenChat = computed(() => {
+		const type = props.openChat?.value?.type;
+		return type === "Chat" || type === "Group";
+	});
+
   const objectsInFolder = computed(()=>{
       const objs = new Set()
       for (const update of props.folderUpdates){
@@ -207,7 +215,8 @@ function setup(props, { emit }) {
 		// folderUpdates,
 		sidebarFolderChannel,
 		toggleNew,
-    root
+		hasOpenChat,
+		root
 	};
 }
 
@@ -215,7 +224,7 @@ function setup(props, { emit }) {
 
 
 export default async () => ({
-  props: ['graffiti', 'session', 'appName', 'contacts', 'allObjects', 'folders', 'folderNavStack', 'openChat', 'openChatChannel', 'folderUpdates', 'chatDeletionCutoffs', 'hiddenChatChannels'],
+  props: ['graffiti', 'session', 'appName', 'contacts', 'allObjects', 'folders', 'folderNavStack', 'openChat', 'openChatChannel', 'folderUpdates', 'chatDeletionCutoffs', 'hiddenChatChannels', 'mutedChatChannels', 'mutedFolderChannels', 'prefetchedMessagesByChannel', 'prefetchedParticipantUpdatesByChannel'],
   emits: ['changeChatChannel', 'changeNavStack'],
   setup,
   template: await fetch(new URL("./home.html", import.meta.url)).then((r) =>

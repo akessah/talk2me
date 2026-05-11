@@ -57,11 +57,54 @@
             <li class="object-menu__item" v-if="objectChannel && folderNavStack.length">
                 <button
                     type="button"
-                    class="object-menu__button remove-from-folder-menu__toggle"
+                    class="object-menu__button object-menu__button--danger-hover remove-from-folder-menu__toggle"
                     @click="removeFromFolder"
                 >
                     Remove from {{ parentFolderTitle }}
                 </button>
+            </li>
+
+            <li
+                class="object-menu__item"
+                v-if="objectChannel && canMuteNotifications"
+            >
+                <button
+                    type="button"
+                    class="object-menu__button"
+                    @click="toggleMuteMenu"
+                    :aria-expanded="muteMenuOpen"
+                >
+                    {{ notificationsMuted ? "Muted" : "Mute notifications" }}
+                </button>
+                <div
+                    v-show="muteMenuOpen"
+                    class="object-menu__mute-dropdown"
+                    role="menu"
+                >
+                    <p class="object-menu__mute-title">{{ muteMenuTitle }}</p>
+                    <ul class="object-menu__mute-list">
+                        <li v-for="option of muteOptions" :key="option.id">
+                            <button
+                                type="button"
+                                class="object-menu__button"
+                                role="menuitem"
+                                :disabled="muteSubmitting"
+                                @click="muteFor(option.durationMs)"
+                            >
+                                {{ option.label }}
+                            </button>
+                        </li>
+                    </ul>
+                    <button
+                        v-if="notificationsMuted"
+                        type="button"
+                        class="object-menu__button"
+                        :disabled="muteSubmitting"
+                        @click="unmuteNotifications"
+                    >
+                        Unmute
+                    </button>
+                </div>
             </li>
 
             <li

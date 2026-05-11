@@ -1,4 +1,4 @@
-import { ref, toRefs, computed, watch, onUnmounted, nextTick } from "vue";
+import { ref, toRefs, computed, watch, onUnmounted, nextTick, inject } from "vue";
 import {
   GraffitiPlugin,
   useGraffiti,
@@ -52,8 +52,21 @@ export default {
     folderNavStack: { type: Array, required: true},
     folderBack: { type: Function, required: true},
     chatDeletionCutoffs: { type: Object, default: () => new Map() },
+    mutedChatChannels: { type: Object, default: () => new Set() },
+    mutedFolderChannels: { type: Object, default: () => new Set() },
+    prefetchedMessagesByChannel: { type: Object, default: () => new Map() },
+    prefetchedParticipantUpdatesByChannel: { type: Object, default: () => new Map() },
   },
   setup(props) {
+    const pendingChatCreations = inject("pendingChatCreations", null);
+
+    const isCreatingOpenChat = computed(() => {
+      const ref = pendingChatCreations;
+      const set = ref && "value" in ref ? ref.value : ref;
+      if (!set || typeof set.has !== "function") return false;
+      return Boolean(props.openChatChannel) && set.has(props.openChatChannel);
+    });
+
     const { objects: messages } = useGraffitiDiscover(
         () => [props.openChatChannel],
         messageDiscoverOpts,
@@ -65,6 +78,24 @@ export default {
       () => [props.openChatChannel],
       participantDiscoverOpts,
       props.session,
+      true,
+    );
+
+    function mapValueForChannel(mapLike, channel) {
+      if (!channel || !mapLike || typeof mapLike.get !== "function") return [];
+      const value = mapLike.get(channel);
+      return Array.isArray(value) ? value : [];
+    }
+
+    const prefetchedMessages = computed(() =>
+      mapValueForChannel(props.prefetchedMessagesByChannel, props.openChatChannel),
+    );
+
+    const prefetchedParticipantUpdates = computed(() =>
+      mapValueForChannel(
+        props.prefetchedParticipantUpdatesByChannel,
+        props.openChatChannel,
+      ),
     );
 
     // const openChat = computed(() =>
@@ -75,9 +106,41 @@ export default {
 
     const newMessage = ref("");
     const participantsDetailsRef = ref(null);
+    const messageInputRef = ref(null);
     const messageThreadRef = ref(null);
     const userPinnedToBottom = ref(true);
     const optimisticMessages = ref([]);
+
+    const newParticipantInput = ref("");
+    const addParticipantError = ref(false);
+    const addParticipantErrorMessage = ref(
+      "This graffiti handle was not found. Please try again.",
+    );
+    const addParticipantShake = ref(false);
+    const addParticipantSubmitting = ref(false);
+    const actorHandleCache = ref(new Map());
+    const actorHandlePending = new Set();
+
+    const ADD_PARTICIPANT_SHAKE_MS = 450;
+
+    function clearAddParticipantShake() {
+      addParticipantShake.value = false;
+    }
+
+    async function triggerAddParticipantShake() {
+      addParticipantShake.value = false;
+      await nextTick();
+      addParticipantShake.value = true;
+      setTimeout(clearAddParticipantShake, ADD_PARTICIPANT_SHAKE_MS);
+    }
+
+    watch(newParticipantInput, () => {
+      addParticipantError.value = false;
+      addParticipantErrorMessage.value =
+        "This graffiti handle was not found. Please try again.";
+    });
+
+    watch(newMessage, resizeMessageInput);
 
     function isNearBottom(el) {
       if (!el) return true;
@@ -94,6 +157,19 @@ export default {
       const el = messageThreadRef.value;
       if (!el) return;
       el.scrollTop = el.scrollHeight;
+    }
+
+    async function resizeMessageInput() {
+      await nextTick();
+      const el = messageInputRef.value;
+      if (!el) return;
+      el.style.height = "auto";
+      const maxHeight = Number.parseFloat(getComputedStyle(el).maxHeight);
+      const nextHeight = Number.isFinite(maxHeight)
+        ? Math.min(el.scrollHeight, maxHeight)
+        : el.scrollHeight;
+      el.style.height = `${nextHeight}px`;
+      el.style.overflowY = el.scrollHeight > nextHeight ? "auto" : "hidden";
     }
 
     function closeParticipants() {
@@ -125,6 +201,13 @@ export default {
       ["Chat", "Group"].includes(props.openChat?.value?.type),
     );
 
+    const canAddParticipants = computed(() => {
+      const chat = props.openChat;
+      const sessionActor = props.session?.actor ?? "";
+      if (!chat || !sessionActor) return false;
+      return chat.actor === sessionActor;
+    });
+
     function contactActorId(c) {
       const v = c?.value;
       return v?.actorId ?? v?.actor ?? "";
@@ -142,16 +225,91 @@ export default {
       return best;
     }
 
+    function cachedHandleForActor(actor) {
+      return actorHandleCache.value.get(actor) ?? "";
+    }
+
+    async function warmActorHandle(actor) {
+      if (!actor) return;
+      if (latestContactForActor(actor)) return;
+      if (actorHandleCache.value.has(actor) || actorHandlePending.has(actor)) return;
+      if (typeof props.graffiti.actorToHandle !== "function") return;
+
+      actorHandlePending.add(actor);
+      try {
+        const resolved = await props.graffiti.actorToHandle(actor);
+        const handle = String(resolved ?? "")
+          .replace(/\.graffiti\.actor$/i, "")
+          .trim();
+        if (!handle) return;
+        const next = new Map(actorHandleCache.value);
+        next.set(actor, handle);
+        actorHandleCache.value = next;
+      } catch {
+        // Best-effort cache warming only.
+      } finally {
+        actorHandlePending.delete(actor);
+      }
+    }
+
+    function findContactByUsername(query) {
+      if (!query) return null;
+      const list = Array.isArray(props.contacts) ? props.contacts : [];
+      const matches = list
+        .filter((c) => c?.value?.username === query)
+        .sort(
+          (a, b) => (b?.value?.published ?? 0) - (a?.value?.published ?? 0),
+        );
+      return matches.length ? matches[0] : null;
+    }
+
+    async function resolveParticipantQuery(query) {
+      const trimmed = query.trim();
+      if (!trimmed) return null;
+
+      const contactMatch = findContactByUsername(trimmed);
+      if (contactMatch) {
+        const actor = contactActorId(contactMatch);
+        if (!actor) return null;
+        return {
+          actor,
+          handle: contactMatch.value.handle || trimmed,
+          shouldPostContact: false,
+        };
+      }
+
+      try {
+        const resolved = await props.graffiti.handleToActor(
+          `${trimmed}.graffiti.actor`,
+        );
+        const actor =
+          typeof resolved === "string" ? resolved : resolved?.actor ?? "";
+        if (!actor) return null;
+        return { actor, handle: trimmed, shouldPostContact: true };
+      } catch (e) {
+        return null;
+      }
+    }
+
     const participants = computed(() => {
       if (!hasOpenChat.value) return [];
       const sessionActor = props.session?.actor ?? "";
-      const updates = Array.isArray(participantUpdates?.value)
-        ? participantUpdates.value
-        : Array.isArray(participantUpdates)
-          ? participantUpdates
-          : [];
+      const updates = [
+        ...prefetchedParticipantUpdates.value,
+        ...(Array.isArray(participantUpdates?.value)
+          ? participantUpdates.value
+          : Array.isArray(participantUpdates)
+            ? participantUpdates
+            : []),
+      ];
+      const baseActors = new Set([
+        props.openChat?.actor,
+        ...(Array.isArray(props.openChat?.allowed) ? props.openChat.allowed : []),
+        sessionActor,
+      ].filter(Boolean));
 
-      // Reduce to latest Add/Remove per actorId, then keep the ones currently "Add".
+      // Apply latest Add/Remove per actorId on top of the chat object's stored
+      // participant baseline so the list renders immediately on chat open.
       const latestByActor = new Map();
       for (const u of updates) {
         const actorId = u?.value?.actorId;
@@ -163,21 +321,21 @@ export default {
         }
       }
 
-      const activeActors = [];
       for (const [actorId, u] of latestByActor.entries()) {
-        if (u?.value?.activity === "Add") activeActors.push(actorId);
+        if (u?.value?.activity === "Add") baseActors.add(actorId);
+        else if (u?.value?.activity === "Remove") baseActors.delete(actorId);
       }
 
       // Always include self so the list doesn't look empty.
-      const unique = new Set([sessionActor, ...activeActors].filter(Boolean));
-      // console.log(unique)
+      const unique = new Set([sessionActor, ...baseActors].filter(Boolean));
       return Array.from(unique).map((actor) => {
         const c = latestContactForActor(actor);
-        // console.log(c)
         const username = c?.value?.username ?? "";
         const handle = c?.value?.handle ?? "";
         // If we have a saved contact, prefer showing the contact's username.
-        const label = c ? (username || handle || "") : (handle || username || "");
+        const label = c
+          ? (username || handle || "")
+          : (cachedHandleForActor(actor) || "");
         return {
           actor,
           label,
@@ -192,9 +350,9 @@ export default {
       if (!actor || actor === props.session?.actor) return;
 
       // If Graffiti supports actor->handle, use it as a default. Otherwise ask.
-      let suggested = "";
+      let suggested = cachedHandleForActor(actor);
       try {
-        if (typeof props.graffiti.actorToHandle === "function") {
+        if (!suggested && typeof props.graffiti.actorToHandle === "function") {
           suggested = await props.graffiti.actorToHandle(actor);
         }
       } catch {
@@ -226,6 +384,145 @@ export default {
         },
         props.session,
       );
+    }
+
+    function isAlreadyParticipant(actor) {
+      if (!actor) return false;
+      return participants.value.some((p) => p.actor === actor);
+    }
+
+    async function addParticipant() {
+      if (addParticipantSubmitting.value) return;
+      const query = newParticipantInput.value;
+      if (!query.trim()) return;
+      const chat = props.openChat;
+      const sessionActor = props.session?.actor ?? "";
+      if (!chat?.value || !sessionActor || !props.openChatChannel) return;
+
+      addParticipantSubmitting.value = true;
+      try {
+        const resolved = await resolveParticipantQuery(query);
+        if (!resolved) {
+          addParticipantError.value = true;
+          addParticipantErrorMessage.value =
+            "This graffiti handle was not found. Please try again.";
+          triggerAddParticipantShake();
+          return;
+        }
+
+        if (resolved.actor === sessionActor) {
+          addParticipantError.value = true;
+          addParticipantErrorMessage.value = "You can't add yourself to the chat.";
+          triggerAddParticipantShake();
+          return;
+        }
+
+        if (isAlreadyParticipant(resolved.actor)) {
+          newParticipantInput.value = "";
+          addParticipantError.value = false;
+          addParticipantErrorMessage.value =
+            "This graffiti handle was not found. Please try again.";
+          return;
+        }
+
+        const currentAllowed = Array.isArray(chat.allowed) ? chat.allowed : [];
+        const newAllowed = Array.from(
+          new Set(
+            [...currentAllowed, resolved.actor].filter(
+              (actor) => actor && actor !== sessionActor,
+            ),
+          ),
+        );
+        const isCreator = chat.actor === sessionActor;
+
+        // The chat object's `allowed` list gates whether a new participant
+        // can discover the chat at all. Only the creator can rewrite it
+        // (delete + re-post). Post first then delete so the panel doesn't
+        // flicker out for current participants while we swap.
+        if (isCreator) {
+          const channelsForRepost =
+            Array.isArray(chat.channels) && chat.channels.length
+              ? chat.channels
+              : [
+                  `${props.appName} chats`,
+                  `${sessionActor}/chats`,
+                ];
+          try {
+            await props.graffiti.post(
+              {
+                value: { ...chat.value },
+                allowed: newAllowed,
+                channels: channelsForRepost,
+              },
+              props.session,
+            );
+            try {
+              await props.graffiti.delete(chat, props.session);
+            } catch (e) {
+              console.error(e);
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
+        try {
+          await props.graffiti.post(
+            {
+              value: {
+                activity: "Add",
+                type: "Participant",
+                actorId: resolved.actor,
+                published: Date.now(),
+              },
+              allowed: newAllowed,
+              channels: [props.openChatChannel],
+            },
+            props.session,
+          );
+        } catch (e) {
+          console.error(e);
+        }
+
+        if (resolved.shouldPostContact) {
+          const list = Array.isArray(props.contacts) ? props.contacts : [];
+          const alreadyContact = list.some(
+            (c) => contactActorId(c) === resolved.actor,
+          );
+          if (!alreadyContact) {
+            try {
+              await props.graffiti.post(
+                {
+                  value: {
+                    actorId: resolved.actor,
+                    username: resolved.handle,
+                    handle: resolved.handle,
+                    published: Date.now(),
+                  },
+                  allowed: [],
+                  channels: [`${sessionActor} contacts`, "my contacts"],
+                },
+                props.session,
+              );
+            } catch (e) {
+              console.error(e);
+            }
+          }
+        }
+
+        newParticipantInput.value = "";
+        addParticipantError.value = false;
+        addParticipantErrorMessage.value =
+          "This graffiti handle was not found. Please try again.";
+      } catch (e) {
+        console.error(e);
+        addParticipantError.value = true;
+        addParticipantErrorMessage.value =
+          "This graffiti handle was not found. Please try again.";
+        triggerAddParticipantShake();
+      } finally {
+        addParticipantSubmitting.value = false;
+      }
     }
 
     function isOwnMessage(message) {
@@ -313,13 +610,21 @@ export default {
 
     const displayedMessages = computed(() => {
       const raw = messages?.value;
-      const list = Array.isArray(raw) ? raw : [];
+      const liveList = Array.isArray(raw) ? raw : [];
+      const prefetched = Array.isArray(prefetchedMessages.value)
+        ? prefetchedMessages.value
+        : [];
       const opts = Array.isArray(optimisticMessages.value)
         ? optimisticMessages.value
         : [];
 
       const filteredOpts = opts.filter((m) => !hasRealMessageForOptimistic(m));
-      const combined = [...list, ...filteredOpts];
+      const deduped = new Map();
+      for (const message of [...prefetched, ...liveList, ...filteredOpts]) {
+        const key = message?.url || message?.__tempId || messageKey(message);
+        deduped.set(key, message);
+      }
+      const combined = Array.from(deduped.values());
       combined.sort((a, b) => (a?.value?.published ?? 0) - (b?.value?.published ?? 0));
 
       const cuts = props.chatDeletionCutoffs;
@@ -332,6 +637,32 @@ export default {
       }
       return combined;
     });
+
+    const actorsNeedingHandleResolution = computed(() => {
+      const actors = new Set();
+      for (const participant of participants.value) {
+        if (participant?.actor && !participant?.label && !participant?.isSelf) {
+          actors.add(participant.actor);
+        }
+      }
+      for (const message of displayedMessages.value) {
+        const actor = message?.actor;
+        if (!actor || actor === props.session?.actor) continue;
+        if (messageDisplayName(actor)) continue;
+        actors.add(actor);
+      }
+      return Array.from(actors);
+    });
+
+    watch(
+      actorsNeedingHandleResolution,
+      (actors) => {
+        for (const actor of actors) {
+          warmActorHandle(actor);
+        }
+      },
+      { immediate: true },
+    );
 
     function isMessageExpanded(message) {
       return expandedMessageKeys.value.has(messageKey(message));
@@ -347,7 +678,7 @@ export default {
 
     function messageDisplayName(actor) {
       const c = latestContactForActor(actor);
-      return c?.value?.username ?? "";
+      return c?.value?.username ?? cachedHandleForActor(actor);
     }
 
     function formatMessageTime(published) {
@@ -359,6 +690,7 @@ export default {
     async function sendMessage(message) {
       const content = String(message ?? "").trim();
       if (!content || !props.openChatChannel) return;
+      if (isCreatingOpenChat.value) return;
 
       const published = Date.now();
       const tempId = `${props.session?.actor ?? ""}\0${published}\0${content}\0${Math.random().toString(16).slice(2)}`;
@@ -431,6 +763,7 @@ export default {
         }
       }
       newMessage.value = "";
+      resizeMessageInput();
     }
 
     watch(
@@ -452,7 +785,7 @@ export default {
     );
 
     watch(
-      messages,
+      displayedMessages,
       async () => {
         if (userPinnedToBottom.value) {
           await scrollMessagesToBottom();
@@ -467,6 +800,11 @@ export default {
         newMessage.value = "";
         expandedMessageKeys.value = new Set();
         closeParticipants();
+        newParticipantInput.value = "";
+        addParticipantError.value = false;
+        addParticipantErrorMessage.value =
+          "This graffiti handle was not found. Please try again.";
+        addParticipantShake.value = false;
       },
     );
 
@@ -475,6 +813,11 @@ export default {
         newMessage.value = "";
         expandedMessageKeys.value = new Set();
         closeParticipants();
+        newParticipantInput.value = "";
+        addParticipantError.value = false;
+        addParticipantErrorMessage.value =
+          "This graffiti handle was not found. Please try again.";
+        addParticipantShake.value = false;
       }
     });
 
@@ -492,14 +835,25 @@ export default {
       isFailedMessage,
       withdrawMessage,
       hasOpenChat,
+      canAddParticipants,
+      isCreatingOpenChat,
       participants,
       promptCreateContactForActor,
+      newParticipantInput,
+      addParticipantError,
+      addParticipantErrorMessage,
+      addParticipantShake,
+      addParticipantSubmitting,
+      addParticipant,
+      clearAddParticipantShake,
       isMessageExpanded,
       toggleMessageExpanded,
       messageDisplayName,
       formatMessageTime,
       participantsDetailsRef,
       onParticipantsToggle,
+      messageInputRef,
+      resizeMessageInput,
       messageThreadRef,
       onMessageThreadScroll,
     //   openChat,

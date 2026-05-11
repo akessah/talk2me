@@ -4,10 +4,11 @@
     </div>
     <div class="folder-sidebar-toolbar" aria-label="Folder navigation">
         <button type="button" class="sidebar-back" @click="folderBack">
-            ← Back
+            <img src="./media/back.svg" class="icon"> Back
         </button>
         <object-menu
             :object-channel="openChatChannel"
+            :active-channel="openChatChannel"
             :folders="folders"
             :folder-updates="folderUpdates"
             :session="session"
@@ -15,14 +16,31 @@
             :graffiti="graffiti"
             :folderBack="folderBack"
             :folderNavStack="folderNavStack"
+            :muted-chat-channels="mutedChatChannels"
+            :muted-folder-channels="mutedFolderChannels"
         ></object-menu>
     </div>
     <ul class="folder-sidebar-list">
-        <li v-for="obj of openFolder" :key="obj.value.channel">
+        <li v-for="obj of openFolder" :key="obj.value.channel" class="folder-sidebar__row">
             <button
                 type="button"
+                class="folder-sidebar__object-button"
+                :class="{
+                    'sidebar-folder-opening': openingChannel === obj.value.channel,
+                    'folder-sidebar__object-button--dragging': draggingChannel === obj.value.channel,
+                    'folder-sidebar__object-button--drop-target': dragOverFolderChannel === obj.value.channel,
+                    'folder-sidebar__object-button--moving': movingObjectChannel === obj.value.channel,
+                }"
+                :draggable="movingObjectChannel !== obj.value.channel"
                 @click="openFromFolder(obj)"
-                :class="{ 'sidebar-folder-opening': openingChannel === obj.value.channel }"
+                @mouseenter="maybePrefetchObject(obj)"
+                @focus="maybePrefetchObject(obj)"
+                @pointerdown="maybePrefetchObject(obj)"
+                @dragstart="onDragStart($event, obj)"
+                @dragend="onDragEnd"
+                @dragover="obj.value.type === 'Folder' && onFolderDragOver($event, obj)"
+                @dragleave="obj.value.type === 'Folder' && onFolderDragLeave($event, obj)"
+                @drop="obj.value.type === 'Folder' && onFolderDrop($event, obj)"
             >
                 <img
                     src="./media/folder.svg"
@@ -35,8 +53,29 @@
                     class="sidebar-list__avatar"
                     aria-hidden="true"
                 >{{ objectInitials(obj) }}</span>
-                {{ obj.value.title }}
+                <span class="folder-sidebar__title">{{ obj.value.title }}</span>
+                <span
+                    v-if="movingObjectChannel === obj.value.channel"
+                    class="folder-sidebar__moving-overlay"
+                    aria-hidden="true"
+                >
+                    Moving
+                </span>
             </button>
+            <object-menu
+                :class="{ 'object-menu--drag-disabled': !!draggingChannel || movingObjectChannel === obj.value.channel }"
+                :object-channel="obj.value.channel"
+                :active-channel="openChatChannel"
+                :folders="folders"
+                :folder-updates="folderUpdates"
+                :session="session"
+                :all-objects="allObjects"
+                :graffiti="graffiti"
+                :folderBack="folderBack"
+                :folderNavStack="folderNavStack"
+                :muted-chat-channels="mutedChatChannels"
+                :muted-folder-channels="mutedFolderChannels"
+            ></object-menu>
         </li>
     </ul>
 </div>

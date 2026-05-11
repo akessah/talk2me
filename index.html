@@ -16,6 +16,7 @@
             }
         </script>
         <link rel="stylesheet" href="./style.css" />
+        <link rel="stylesheet" href="./components/contact/contact.css" />
         <link rel="stylesheet" href="./components/contacts/contacts.css" />
         <link rel="stylesheet" href="./components/NewObjectSidebar/NewObjectSidebar.css" />
         <link rel="stylesheet" href="./components/FolderSidebar/FolderSidebar.css" />
@@ -42,12 +43,12 @@
                     <p class="app-intro">Logged in as: <graffiti-actor-to-handle :actor="$graffitiSession.value?.actor"></graffiti-actor-to-handle></p>
 
                     <div class="app-topbar">
-                        <!-- <button @click="deleteContacts" :disabled="deleting">
+                        <button @click="deleteContacts" :disabled="deleting">
                             {{deleting? 'Deleting...':'Delete Contacts'}}
                         </button>
                         <button @click="deleteObjects" :disabled="deleting">
                             {{deleting? 'Deleting...':'Delete Objects'}}
-                        </button> -->
+                        </button>
                         <nav class="app-tabs" aria-label="Primary navigation">
                             <router-link to="/" custom v-slot="{ navigate, isActive }">
                                 <button
@@ -58,7 +59,7 @@
                                     @click="navigate"
                                 >
                                     <img src="./media/home.svg" alt="" />
-                                    Home
+                                    <span class="app-tab__label">Home</span>
                                 </button>
                             </router-link>
                             <router-link to="/inbox" custom v-slot="{ navigate, isActive }">
@@ -69,13 +70,14 @@
                                         'app-tab--active': isActive,
                                         'inbox-button--ring': inboxBellRinging,
                                     }"
+                                    aria-label="Inbox"
                                     @click="navigate"
                                 >
                                     <span class="inbox-button__bell" aria-hidden="true">
                                         <img src="./media/bell.svg" class="icon inbox-button__bell-icon" alt="" />
                                         <span v-if="inboxUnreadCount" class="inbox-button__dot" aria-hidden="true"></span>
                                     </span>
-                                    Inbox
+                                    <span class="app-tab__label">Inbox</span>
                                 </button>
                             </router-link>
                             <router-link to="/contacts" custom v-slot="{ navigate, isActive }">
@@ -83,18 +85,21 @@
                                     type="button"
                                     class="app-tab"
                                     :class="{ 'app-tab--active': isActive }"
+                                    aria-label="Contacts"
                                     @click="navigate"
                                 >
-                                <img src="./media/contacts.svg" class="icon"/>
-                                    Contacts
+                                    <img src="./media/contacts.svg" class="icon"/>
+                                    <span class="app-tab__label">Contacts</span>
                                 </button>
                             </router-link>
                             <button
                                 type="button"
                                 class="app-tab"
+                                aria-label="Log Out"
                                 @click="$graffiti.logout($graffitiSession.value)"
                             >
-                                Log Out
+                                <img src="./media/logout.svg" class="icon"/>
+                                <span class="app-tab__label">Log Out</span>
                             </button>
                             <span class="app-tabs__indicator" aria-hidden="true"></span>
                         </nav>
@@ -116,6 +121,11 @@
                         :folder-updates="folderUpdates"
                         :chat-deletion-cutoffs="chatDeletionCutoffs"
                         :hidden-chat-channels="hiddenChatChannels"
+                        :muted-contact-actors="mutedContactActors"
+                        :muted-chat-channels="mutedChatChannels"
+                        :muted-folder-channels="mutedFolderChannels"
+                        :prefetched-messages-by-channel="prefetchedMessagesByChannel"
+                        :prefetched-participant-updates-by-channel="prefetchedParticipantUpdatesByChannel"
                         @change-chat-channel="changeChatChannel"
                         @change-nav-stack="changeNavStack"
                     >

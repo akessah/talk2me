@@ -1,49 +1,145 @@
 <div id="contact">
-    <!-- <h1>contact!</h1> -->
-    <div class="profile">
-        <!-- <img class="profile-pic" @click="zoom=!zoom" :src="profilePic"/> -->
-        <!-- <button v-if="zoom">Change Image</button> -->
-        <div class="title">
-            <h1 v-if="!editUsername">{{contact.value?.username}}</h1>
-            <button v-if="!editUsername" @click="{editUsername=!editUsername; usernameBuf=contact.value.username;}">Change</button>
-            <form @submit.prevent="changeUsername" v-else>
-                <input type="text" v-model="usernameBuf"/>
-                <button type="submit">Save</button>
-            </form>
-            <h2>{{contact.value?.handle}}.actor.graffiti</h2>
-        </div>
-        <div class="buttons">
-            <button id="notification-button">notifications</button>
-            <button id="mute-button">mute</button>
-            <button id="search-button">search</button>
-            <button id="block-button">block</button>
-            <router-link :to="'/'"><button id="chat-button" @click="createChat">chat</button></router-link>
-        </div>
-        <div class="chat-list">
-            <ul class="chats-list" v-if="showList=='chats'">
-                <li v-for="chat of contactChats" :key="chat.value.channel">
-                    <router-link :to="'/'">
-                        <button type="button" @click="openChat(chat)">
-                        <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="chat.value.type === 'Folder'">
-                        <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else>
-                            {{chat.value.title}}
+    <div v-if="contact" class="contact-page">
+        <section class="contact-card">
+            <div class="contact-card__header">
+                <div class="contact-card__avatar" aria-hidden="true">
+                    {{ contactInitials }}
+                </div>
+                <div class="contact-card__identity">
+                    <div v-if="!editUsername" class="contact-card__name-row">
+                        <h2 class="contact-card__name">{{ contactDisplayName }}</h2>
+                        <button
+                            type="button"
+                            class="contact-card__edit-button"
+                            @click="startEditingUsername"
+                        >
+                            Change
                         </button>
-                    </router-link>
-                </li>
-            </ul>
-            <ul class="chats-list" v-else>
-                <li v-for="group of contactGroups" :key="group.value.channel">
-                    <router-link :to="`/`">
-                    <button type="button" @click="openChat(group)">
-                    <img src="./media/folder.svg" alt="Folder" class="folder-object-list__icon" v-if="group.value.type === 'Folder'">
-                    <img src="./media/profile.svg" alt="Profile" class="folder-object-list__icon" v-else>
-                        {{group.value.title}}
+                    </div>
+                    <form
+                        v-else
+                        class="contact-card__edit-form"
+                        @submit.prevent="changeUsername"
+                    >
+                        <input
+                            type="text"
+                            v-model="usernameBuf"
+                            placeholder="Display name"
+                        />
+                        <button type="submit">Save</button>
+                    </form>
+                    <p class="contact-card__handle">{{ contactHandleText }}</p>
+                </div>
+            </div>
+
+            <div class="contact-card__actions">
+                <!-- <button type="button" class="contact-card__action">Notifications</button> -->
+                <div ref="muteMenuRef" class="contact-card__mute-menu">
+                    <button
+                        type="button"
+                        class="contact-card__action"
+                        :class="{ 'contact-card__action--active': notificationsMuted }"
+                        :disabled="muteSubmitting"
+                        :aria-expanded="showMutePopup ? 'true' : 'false'"
+                        @click="toggleMutePopup"
+                    >
+                        {{ muteSubmitting ? "Saving..." : (notificationsMuted ? "Muted" : "Mute") }}
                     </button>
-                    </router-link>
+                    <div
+                        v-if="showMutePopup"
+                        class="contact-card__mute-popup"
+                        role="dialog"
+                        aria-label="Mute notifications"
+                    >
+                        <p class="contact-card__mute-title">Mute notifications for</p>
+                        <div class="contact-card__mute-options">
+                            <button
+                                v-for="option in muteOptions"
+                                :key="option.id"
+                                type="button"
+                                class="contact-card__mute-option"
+                                :disabled="muteSubmitting"
+                                @click="muteFor(option.durationMs)"
+                            >
+                                {{ option.label }}
+                            </button>
+                        </div>
+                        <button
+                            v-if="notificationsMuted"
+                            type="button"
+                            class="contact-card__mute-clear"
+                            :disabled="muteSubmitting"
+                            @click="unmuteNotifications"
+                        >
+                            Unmute
+                        </button>
+                    </div>
+                </div>
+                <!-- <button type="button" class="contact-card__action">Search</button> -->
+                <!-- <button type="button" class="contact-card__action">Block</button> -->
+                <button
+                    type="button"
+                    class="contact-card__action contact-card__action--primary"
+                    @click="createChat"
+                >
+                    Chat
+                </button>
+            </div>
+        </section>
+
+        <section class="contact-conversations">
+            <div class="contact-conversations__header">
+                <h2 class="contact-conversations__title">Shared conversations</h2>
+                <div class="contact-conversations__tabs" role="tablist" aria-label="Conversation type">
+                    <button
+                        type="button"
+                        class="contact-conversations__tab"
+                        :class="{ 'contact-conversations__tab--active': showList === 'chats' }"
+                        @click="showList = 'chats'"
+                    >
+                        Chats
+                    </button>
+                    <button
+                        type="button"
+                        class="contact-conversations__tab"
+                        :class="{ 'contact-conversations__tab--active': showList === 'groups' }"
+                        @click="showList = 'groups'"
+                    >
+                        Groups
+                    </button>
+                </div>
+            </div>
+
+            <ul v-if="visibleConversations.length" class="contact-conversations__list">
+                <li
+                    v-for="conversation of visibleConversations"
+                    :key="conversation.value.channel"
+                    class="contact-conversations__item"
+                >
+                    <button
+                        type="button"
+                        class="contact-conversations__button"
+                        @click="openConversation(conversation)"
+                    >
+                        <span class="contact-conversations__avatar" aria-hidden="true">
+                            {{ conversationInitials(conversation) }}
+                        </span>
+                        <span class="contact-conversations__meta">
+                            <span class="contact-conversations__name">
+                                {{ conversation.value.title }}
+                            </span>
+                            <span class="contact-conversations__kind">
+                                {{ conversation.value.type }}
+                            </span>
+                        </span>
+                    </button>
                 </li>
             </ul>
-        </div>
+
+            <p v-else class="contact-conversations__empty">
+                No shared {{ showList === "groups" ? "groups" : "chats" }} yet.
+            </p>
+        </section>
     </div>
-
-
+    <p v-else class="contact-empty">This contact could not be found.</p>
 </div>

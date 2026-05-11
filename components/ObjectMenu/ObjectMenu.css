@@ -75,7 +75,35 @@ button.object-menu-button img {
   outline-offset: 2px;
 }
 
+.object-menu__mute-dropdown {
+  padding: 0.35rem 0.45rem 0.15rem;
+}
+
+.object-menu__mute-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.object-menu__mute-list {
+  list-style: none;
+  margin: 0 0 0.2rem;
+  padding: 0;
+}
+
+.object-menu__mute-list li {
+  margin: 0;
+}
+
 .object-menu__button--danger {
   color: var(--danger, #d64040);
   font-weight: 700;
+}
+
+.object-menu__button--danger-hover:hover,
+.object-menu__button--danger-hover:focus-visible,
+.object-menu__button--danger:hover,
+.object-menu__button--danger:focus-visible {
+  color: var(--danger, #d64040);
+  background: rgba(214, 64, 64, 0.12);
 }

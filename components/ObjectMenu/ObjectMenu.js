@@ -1,4 +1,9 @@
 import { ref, toRefs, computed, watch, onUnmounted, nextTick } from "vue";
+import {
+  addObjectExclusiveToFolder,
+  currentFolderForObject,
+} from "../folderOperations.js";
+import { NOTIFICATION_MUTE_OPTIONS } from "../notificationMuteOptions.js";
 
 
 export default {
@@ -6,15 +11,20 @@ export default {
     folderUpdates: { type: [Array, Object], default: () => [] },
     allObjects: { type: Array, default: () => [] },
     objectChannel: { type: String, default: "" },
+    activeChannel: { type: String, default: "" },
     folders: { type: Array, required: true},
     session: { type: Object, required: true },
     graffiti: { type: Object, required: true },
     folderNavStack: { type: Array, requred: true},
-    folderBack: {type: Function, required: true}
+    folderBack: {type: Function, required: true},
+    mutedChatChannels: { type: Object, default: () => new Set() },
+    mutedFolderChannels: { type: Object, default: () => new Set() },
   },
   setup(props) {
     const menuOpen = ref(false);
     const addMenuOpen = ref(false);
+    const muteMenuOpen = ref(false);
+    const muteSubmitting = ref(false);
     const menuButtonRef = ref(null);
     const menuListRef = ref(null);
 
@@ -29,6 +39,7 @@ export default {
       }
       menuOpen.value = false;
       addMenuOpen.value = false;
+      muteMenuOpen.value = false;
     }
 
     let documentListenerOn = false;
@@ -41,9 +52,13 @@ export default {
             documentListenerOn = true;
           }, 0);
         });
-      } else if (documentListenerOn) {
-        document.removeEventListener("click", onDocumentClick);
-        documentListenerOn = false;
+      } else {
+        if (documentListenerOn) {
+          document.removeEventListener("click", onDocumentClick);
+          documentListenerOn = false;
+        }
+        addMenuOpen.value = false;
+        muteMenuOpen.value = false;
       }
     });
 
@@ -76,6 +91,7 @@ export default {
 
     function toggleMenu() {
         addMenuOpen.value = !addMenuOpen.value;
+        if (addMenuOpen.value) muteMenuOpen.value = false;
     }
 
     const objectType = computed(() => {
@@ -84,6 +100,43 @@ export default {
       const obj = list.find((o) => o.value?.channel === props.objectChannel);
       return obj?.value?.type ?? "";
     });
+
+    const canMuteNotifications = computed(
+      () =>
+        objectType.value === "Chat" ||
+        objectType.value === "Group" ||
+        objectType.value === "Folder",
+    );
+
+    const notificationsMuted = computed(() => {
+      if (!props.objectChannel) return false;
+      if (objectType.value === "Folder") {
+        const mutedFolders = props.mutedFolderChannels;
+        return Boolean(
+          mutedFolders &&
+            typeof mutedFolders.has === "function" &&
+            mutedFolders.has(props.objectChannel),
+        );
+      }
+      const mutedChats = props.mutedChatChannels;
+      return Boolean(
+        mutedChats &&
+          typeof mutedChats.has === "function" &&
+          mutedChats.has(props.objectChannel),
+      );
+    });
+
+    const muteMenuTitle = computed(() =>
+      objectType.value === "Folder"
+        ? "Mute notifications in this folder for"
+        : "Mute notifications for",
+    );
+
+    function toggleMuteMenu() {
+      if (!canMuteNotifications.value || muteSubmitting.value) return;
+      muteMenuOpen.value = !muteMenuOpen.value;
+      if (muteMenuOpen.value) addMenuOpen.value = false;
+    }
 
     const parentFolderChannel = computed(() => {
         const s = props.folderNavStack;
@@ -98,6 +151,14 @@ export default {
         const obj = list.find((o) => o.value.channel === id);
         return obj?.value?.title ?? "folder";
     });
+
+    function shouldNavigateAfterAction() {
+      return (
+        Boolean(props.objectChannel) &&
+        Boolean(props.activeChannel) &&
+        props.objectChannel === props.activeChannel
+      );
+    }
 
     async function removeFromFolder() {
         const current = parentFolderChannel.value;
@@ -133,7 +194,7 @@ export default {
             );
         }
 
-        if (typeof folderBackFn === "function") {
+        if (shouldNavigateAfterAction() && typeof folderBackFn === "function") {
             folderBackFn();
         }
     }
@@ -187,94 +248,6 @@ export default {
 
       // Finally, move the current object into the new folder.
       await addToFolder(folderChannel);
-    }
-
-    function latestFolderUpdatesByPair(updates) {
-        const byPair = new Map();
-        for (const u of updates || []) {
-            const k = `${u.value.obj}\0${u.value.target}`;
-            const cur = byPair.get(k);
-            if (!cur || u.value.published > cur.value.published) {
-                byPair.set(k, u);
-            }
-        }
-        return byPair;
-    }
-
-    function folderTargetsContainingObject(updates, objectChannel) {
-      const byPair = latestFolderUpdatesByPair(updates);
-      const targets = [];
-      for (const u of byPair.values()) {
-        if (u.value.obj === objectChannel && u.value.activity === "Add") {
-          targets.push(u.value.target);
-        }
-      }
-      return targets;
-    }
-
-    function currentFolderForObject(updates, objectChannel) {
-      const byPair = latestFolderUpdatesByPair(updates);
-      let best = null;
-      for (const u of byPair.values()) {
-        if (u.value.obj !== objectChannel || u.value.activity !== "Add") continue;
-        if (!best || u.value.published > best.value.published) {
-          best = u;
-        }
-      }
-      return best ? best.value.target : null;
-    }
-
-    async function addObjectExclusiveToFolder({
-      graffiti,
-      session,
-      objectChannel,
-      targetFolderChannel,
-      folderUpdates,
-    }) {
-      const updates = Array.isArray(folderUpdates) ? folderUpdates : [];
-      let t = Date.now();
-      const nextTs = () => {
-        t += 1;
-        return t;
-      };
-
-      const targets = folderTargetsContainingObject(updates, objectChannel);
-
-      for (const folderId of targets) {
-        if (folderId !== targetFolderChannel) {
-          await graffiti.post(
-            {
-              value: {
-                activity: "Remove",
-                obj: objectChannel,
-                target: folderId,
-                published: nextTs(),
-              },
-              allowed: [],
-              channels: [`${session.actor}/folders`],
-            },
-            session
-          );
-        }
-      }
-
-      const alreadyOnlyHere =
-        targets.length === 1 && targets[0] === targetFolderChannel;
-      if (alreadyOnlyHere) return;
-
-      await graffiti.post(
-        {
-          value: {
-            activity: "Add",
-            obj: objectChannel,
-            target: targetFolderChannel,
-            published: nextTs(),
-          },
-          allowed: [],
-          channels: [`${session.actor}/folders`],
-        },
-        session
-      );
     }
 
     async function postChatDeletion(chatChannel) {
@@ -424,7 +397,7 @@ export default {
       menuOpen.value = false;
       addMenuOpen.value = false;
 
-      if (typeof folderBackFn === "function") {
+      if (shouldNavigateAfterAction() && typeof folderBackFn === "function") {
         folderBackFn();
       }
     }
@@ -485,25 +458,79 @@ export default {
       menuOpen.value = false;
       addMenuOpen.value = false;
 
-      if (typeof folderBackFn === "function") {
+      if (shouldNavigateAfterAction() && typeof folderBackFn === "function") {
         folderBackFn();
+      }
+    }
+
+    async function postNotificationMute(activity, durationMs = 0) {
+      if (!props.objectChannel || !canMuteNotifications.value) return;
+      const published = Date.now();
+      const value = {
+        type: "NotificationMute",
+        activity,
+        targetType: objectType.value === "Folder" ? "Folder" : "Chat",
+        targetId: props.objectChannel,
+        published,
+      };
+      if (activity === "Mute" && durationMs > 0) {
+        value.expiresAt = published + durationMs;
+      }
+      await props.graffiti.post(
+        {
+          value,
+          allowed: [],
+          channels: [`${props.session.actor}/notification-mutes`],
+        },
+        props.session,
+      );
+    }
+
+    async function muteFor(durationMs) {
+      if (muteSubmitting.value) return;
+      muteSubmitting.value = true;
+      try {
+        await postNotificationMute("Mute", durationMs);
+        muteMenuOpen.value = false;
+      } finally {
+        muteSubmitting.value = false;
+      }
+    }
+
+    async function unmuteNotifications() {
+      if (muteSubmitting.value) return;
+      muteSubmitting.value = true;
+      try {
+        await postNotificationMute("Unmute");
+        muteMenuOpen.value = false;
+      } finally {
+        muteSubmitting.value = false;
       }
     }
 
 
     return {
         ...toRefs(props),
+        muteOptions: NOTIFICATION_MUTE_OPTIONS,
         parentFolderTitle,
         removeFromFolder,
         addMenuOpen,
+        muteMenuOpen,
+        muteSubmitting,
         targetFolders,
         addToFolder,
         createFolderAndMove,
         toggleMenu,
+        toggleMuteMenu,
         menuOpen,
         menuButtonRef,
         menuListRef,
         objectType,
+        canMuteNotifications,
+        notificationsMuted,
+        muteMenuTitle,
+        muteFor,
+        unmuteNotifications,
         deleteObject,
         emptyAndDeleteFolder,
     };

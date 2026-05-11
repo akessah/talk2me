@@ -1,4 +1,5 @@
-import { ref, toRefs, nextTick, watch } from "vue";
+import { ref, toRefs, nextTick, watch, inject } from "vue";
+import { useRouter } from "vue-router";
 
 export default {
   props: {
@@ -11,12 +12,18 @@ export default {
     sidebarFolderChannel: { type: [String, null], default: null },
   },
   setup(props) {
+    const router = useRouter();
+    const startChatCreation = inject("startChatCreation", () => {});
+    const finishChatCreation = inject("finishChatCreation", () => {});
+
     const newChatName = ref("");
     const otherHandle = ref("");
+    const chatParticipants = ref([]);
     const newGroupName = ref("");
     const otherHandles = ref("");
     const newFolderName = ref("");
     const handleError = ref(false);
+    const handleErrorMessage = ref("This graffiti handle was not found. Please try again.");
     const shakeHandleInput = ref(false);
     const submitting = ref(false);
 
@@ -35,6 +42,7 @@ export default {
 
     watch(otherHandle, () => {
       handleError.value = false;
+      handleErrorMessage.value = "This graffiti handle was not found. Please try again.";
     });
     // let graffitiActor = useGraffitiHandleToActor(
     //       `googoo.graffiti.actor`
@@ -70,104 +78,218 @@ export default {
       return matches.length > 0 ? matches[0] : null;
     }
 
-    async function createChat(name, other) {
+    function contactActorId(contact) {
+      const v = contact?.value;
+      return v?.actorId ?? v?.actor ?? "";
+    }
+
+    async function resolveChatParticipant(query) {
+      const trimmed = query.trim();
+      if (!trimmed) return null;
+
+      const contactMatch = findContactByUsername(trimmed);
+      if (contactMatch) {
+        const actor = contactActorId(contactMatch);
+        if (!actor) return null;
+        return {
+          actor,
+          label: contactMatch.value.username || contactMatch.value.handle || trimmed,
+          handle: contactMatch.value.handle || trimmed,
+          shouldPostContact: false,
+        };
+      }
+
+      try {
+        const resolved = await props.graffiti.handleToActor(
+          `${trimmed}.graffiti.actor`
+        );
+        const actor =
+          typeof resolved === "string" ? resolved : resolved?.actor ?? "";
+        if (!actor) return null;
+        return {
+          actor,
+          label: trimmed,
+          handle: trimmed,
+          shouldPostContact: true,
+        };
+      } catch (e) {
+        console.log(e);
+        return null;
+      }
+    }
+
+    async function addChatParticipant() {
+      const participant = await resolveChatParticipant(otherHandle.value);
+      if (!participant) {
+        handleError.value = true;
+        handleErrorMessage.value = "This graffiti handle was not found. Please try again.";
+        triggerHandleShake();
+        return;
+      }
+
+      if (participant.actor === props.session?.actor) {
+        handleError.value = true;
+        handleErrorMessage.value = "You can't add yourself to the chat.";
+        triggerHandleShake();
+        return;
+      }
+
+      if (!chatParticipants.value.some((p) => p.actor === participant.actor)) {
+        chatParticipants.value = [...chatParticipants.value, participant];
+      }
+      otherHandle.value = "";
+      handleError.value = false;
+      handleErrorMessage.value = "This graffiti handle was not found. Please try again.";
+    }
+
+    function removeChatParticipant(actor) {
+      chatParticipants.value = chatParticipants.value.filter(
+        (p) => p.actor !== actor
+      );
+    }
+
+    async function createChat(name) {
+      const trimmedName = String(name ?? "").trim();
+      if (!trimmedName) return;
+      const participants = chatParticipants.value.slice();
+      if (!participants.length) return;
+
       submitting.value = true;
-      try{
-        let otherActor;
 
-        const contactMatch = findContactByUsername(other);
-        if (contactMatch) {
-          otherActor = contactMatch.value.actorId;
-        } else {
-          otherActor = (await props.graffiti.handleToActor(
-            `${other}.graffiti.actor`
-          ));
-          if (otherActor.actor)
+      // Capture everything we need before navigating + unmounting the sidebar.
+      const graffiti = props.graffiti;
+      const session = props.session;
+      const appName = props.appName;
+      const sessionActor = session?.actor ?? "";
+      const contactsSnapshot = Array.isArray(props.contacts)
+        ? props.contacts.slice()
+        : [];
+      const targetFolder = props.sidebarFolderChannel;
 
+      const participantActors = participants.map((p) => p.actor);
+      const recipientActors = Array.from(
+        new Set(participantActors.filter((actor) => actor && actor !== sessionActor))
+      );
 
-          if (props.contacts.find(c => c.value.actor === otherActor.actor) === undefined){
-            console.log(await props.graffiti.post(
+      const chatChannel = crypto.randomUUID();
+      const t = Date.now();
+      const chatChannelsList = [
+        `${appName} chats`,
+        `${sessionActor}/chats`,
+      ];
+
+      try {
+        // 1. Register the optimistic chat so the chat panel can render
+        //    immediately with the correct title.
+        startChatCreation({
+          channel: chatChannel,
+          title: trimmedName,
+          published: t,
+          actor: sessionActor,
+          allowed: recipientActors,
+          channels: chatChannelsList,
+        });
+
+        // 2. Reset form + close the sidebar.
+        chatParticipants.value = [];
+        handleError.value = false;
+        newChatName.value = "";
+        otherHandle.value = "";
+        props.toggleNew();
+
+        // 3. Navigate to the new chat URL.
+        router.push(`/${encodeURIComponent(chatChannel)}`);
+      } catch (e) {
+        console.error(e);
+        finishChatCreation(chatChannel);
+        handleError.value = true;
+        triggerHandleShake();
+        submitting.value = false;
+        return;
+      } finally {
+        submitting.value = false;
+      }
+
+      // 4. Run the actual graffiti posts in the background. The chat panel
+      //    keeps Send disabled (via pendingChatCreations) until this resolves.
+      (async () => {
+        try {
+          for (const participant of participants) {
+            const existing = contactsSnapshot.find(
+              (c) => contactActorId(c) === participant.actor
+            );
+            if (!existing && participant.shouldPostContact) {
+              await graffiti.post(
+                {
+                  value: {
+                    actorId: participant.actor,
+                    username: participant.handle,
+                    handle: participant.handle,
+                    published: Date.now(),
+                  },
+                  allowed: [],
+                  channels: [
+                    `${sessionActor} contacts`,
+                    "my contacts",
+                  ],
+                },
+                session
+              );
+            }
+          }
+
+          await graffiti.post(
+            {
+              value: {
+                activity: "Create",
+                type: "Chat",
+                channel: chatChannel,
+                title: trimmedName,
+                published: t,
+              },
+              allowed: recipientActors,
+              channels: chatChannelsList,
+            },
+            session
+          );
+
+          for (const actorId of participantActors) {
+            await graffiti.post(
               {
                 value: {
-                  actorId: otherActor,
-                  username: other,
-                  handle: other,
+                  activity: "Add",
+                  type: "Participant",
+                  actorId,
                   published: Date.now(),
                 },
-                allowed: [],
-                channels: [
-                  `${props.session.actor} contacts`,
-                  'my contacts'
-                ],
+                allowed: recipientActors,
+                channels: [chatChannel],
               },
-              props.session
-            ));
+              session
+            );
           }
+
+          if (targetFolder) {
+            await graffiti.post(
+              {
+                value: {
+                  activity: "Add",
+                  obj: chatChannel,
+                  target: targetFolder,
+                  published: t + 1,
+                },
+                allowed: [],
+                channels: [`${sessionActor}/folders`],
+              },
+              session
+            );
+          }
+        } catch (e) {
+          console.error(e);
+        } finally {
+          finishChatCreation(chatChannel);
         }
-      console.log(1)
-      const t = Date.now();
-      const chatChannel = crypto.randomUUID();
-      await props.graffiti.post(
-        {
-          value: {
-            activity: "Create",
-            type: "Chat",
-            channel: chatChannel,
-            title: name,
-            published: t,
-          },
-          allowed: [otherActor],
-          channels: [
-            `${props.appName} chats`,
-            `${props.session.actor}/chats`,
-          ],
-        },
-        props.session
-      );
-      await props.graffiti.post(
-        {
-          value: {
-            activity: "Add",
-            type: "Participant",
-            actorId: otherActor,
-            published: Date.now(),
-          },
-          allowed: [otherActor],
-          channels: [
-            chatChannel
-          ],
-        },
-        props.session
-      )
-      await props.graffiti.post(
-        {
-          value: {
-            activity: "Add",
-            type: "Participant",
-            actorId: props.session.actor,
-            published: Date.now(),
-          },
-          allowed: [otherActor],
-          channels: [
-            chatChannel
-          ],
-        },
-        props.session
-      )
-      console.log(2)
-      await addObjectToOpenFolder(chatChannel, t + 1);
-      console.log(3)
-      handleError.value = false;
-      props.toggleNew();
-      console.log(4)
-    }catch(e){
-      console.log(e)
-      handleError.value=true;
-      triggerHandleShake();
-      return;
-    } finally {
-      submitting.value = false;
-    }
+      })();
     }
 
     // watch(graffitiActor, async (oldActor, otherActor) => {
@@ -320,7 +442,11 @@ export default {
       newGroupName,
       otherHandles,
       otherHandle,
+      chatParticipants,
+      addChatParticipant,
+      removeChatParticipant,
       handleError,
+      handleErrorMessage,
       shakeHandleInput,
       clearHandleShakeAnimation,
       submitting,

@@ -2,7 +2,7 @@
 
     <!-- Sidebar -->
      <!-- <p>home!</p> -->
-<div id="home">
+<div id="home" :class="{ 'home--chat-open': hasOpenChat }">
     <div id="sidebar">
         <new-object-sidebar
             :session="session"
@@ -31,6 +31,8 @@
                 :graffiti="graffiti"
                 :contacts="contacts"
                 :hiddenChatChannels="hiddenChatChannels"
+                :mutedChatChannels="mutedChatChannels"
+                :mutedFolderChannels="mutedFolderChannels"
                 @changeNavStack="$emit('changeNavStack', $event)"
                 @changeChatChannel="$emit('changeChatChannel', $event)"
             ></folder-sidebar>
@@ -39,10 +41,18 @@
                 v-else-if="!newObject"
                 key="root"
                 :allObjects="root"
+                :menuObjects="allObjects"
                 :openChatChannel="openChatChannel"
                 :openObjectFromRoot="openObjectFromRoot"
                 :contacts="contacts"
                 :session="session"
+                :folders="folders"
+                :folderUpdates="folderUpdates"
+                :graffiti="graffiti"
+                :folderNavStack="folderNavStack"
+                :folderBack="folderBack"
+                :mutedChatChannels="mutedChatChannels"
+                :mutedFolderChannels="mutedFolderChannels"
             ></root-sidebar>
         </transition>
         <button @click="toggleNew">{{newObject ? "Cancel" : "New"}}</button>
@@ -65,6 +75,10 @@
         :folderBack="folderBack"
         :folderUpdates="folderUpdates"
         :chatDeletionCutoffs="chatDeletionCutoffs"
+        :mutedChatChannels="mutedChatChannels"
+        :mutedFolderChannels="mutedFolderChannels"
+        :prefetchedMessagesByChannel="prefetchedMessagesByChannel"
+        :prefetchedParticipantUpdatesByChannel="prefetchedParticipantUpdatesByChannel"
 
     ></chat>
 

@@ -71,21 +71,106 @@
   margin: 0;
 }
 
-#folder-sidebar ul.folder-sidebar-list button {
+#folder-sidebar ul.folder-sidebar-list li.folder-sidebar__row {
+  position: relative;
+}
+
+#folder-sidebar ul.folder-sidebar-list .folder-sidebar__object-button {
+  position: relative;
+  min-width: 0;
   width: 100%;
   text-align: left;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 3.6rem 0.75rem 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
   font-weight: 500;
   display: flex;
   align-items: center;
   gap: 0.85rem;
+  cursor: grab;
 }
 
-#folder-sidebar ul.folder-sidebar-list button:hover {
+#folder-sidebar ul.folder-sidebar-list .folder-sidebar__object-button:hover {
   background: var(--surface-hover);
   border-color: var(--accent);
+}
+
+#folder-sidebar .folder-sidebar__object-button--dragging {
+  opacity: 0.72;
+  cursor: grabbing;
+}
+
+#folder-sidebar .folder-sidebar__object-button--moving {
+  color: var(--text-muted);
+  cursor: progress;
+  filter: grayscale(0.2);
+}
+
+#folder-sidebar .folder-sidebar__object-button--drop-target {
+  background: rgba(91, 141, 239, 0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(91, 141, 239, 0.18);
+}
+
+#folder-sidebar .folder-sidebar__title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#folder-sidebar .folder-sidebar__moving-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: rgba(230, 225, 235, 0.82);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+#folder-sidebar ul.folder-sidebar-list li.folder-sidebar__row > .object-menu {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+
+#folder-sidebar ul.folder-sidebar-list li.folder-sidebar__row > .object-menu .object-menu-button {
+  background: transparent;
+}
+
+#folder-sidebar ul.folder-sidebar-list li.folder-sidebar__row > .object-menu.object-menu--drag-disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (min-width: 721px) {
+  #folder-sidebar ul.folder-sidebar-list li.folder-sidebar__row > .object-menu {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease-out;
+  }
+
+  #folder-sidebar ul.folder-sidebar-list li.folder-sidebar__row:hover > .object-menu,
+  #folder-sidebar ul.folder-sidebar-list li.folder-sidebar__row:focus-within > .object-menu {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  #folder-sidebar ul.folder-sidebar-list li.folder-sidebar__row > .object-menu {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 #folder-sidebar .sidebar-list__avatar {

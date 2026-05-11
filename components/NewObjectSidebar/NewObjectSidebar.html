@@ -1,6 +1,6 @@
 <div id="new-object-sidebar">
     <h3>Create Chat</h3>
-    <form @submit.prevent="createChat(newChatName, otherHandle)" class="new-chat-form">
+    <form @submit.prevent="createChat(newChatName)" class="new-chat-form">
         <input type="text" v-model="newChatName" placeholder="Chat Name"/>
         <div class="new-chat-form__handle-field">
             <input
@@ -15,24 +15,55 @@
                 :aria-invalid="handleError"
                 :aria-describedby="handleError ? 'new-chat-handle-error' : undefined"
                 @animationend="clearHandleShakeAnimation"
+                @keydown.enter.prevent="addChatParticipant"
             />
+            <button
+                type="button"
+                class="new-chat-form__add-participant"
+                :disabled="submitting || !otherHandle.trim()"
+                @click="addChatParticipant"
+            >
+                Add
+            </button>
             <p
                 v-if="handleError"
                 id="new-chat-handle-error"
                 class="new-chat-form__handle-error"
                 role="alert"
             >
-                This graffiti handle was not found. Please try again.
+                {{ handleErrorMessage }}
             </p>
         </div>
+        <ul
+            v-if="chatParticipants.length"
+            class="new-chat-form__participants"
+            aria-label="Chat participants"
+        >
+            <li
+                v-for="participant of chatParticipants"
+                :key="participant.actor"
+                class="new-chat-form__participant"
+            >
+                <span>{{ participant.label }}</span>
+                <button
+                    type="button"
+                    class="new-chat-form__remove-participant"
+                    :disabled="submitting"
+                    @click="removeChatParticipant(participant.actor)"
+                    :aria-label="`Remove ${participant.label}`"
+                >
+                    Remove
+                </button>
+            </li>
+        </ul>
         <button
             type="submit"
-            :disabled="submitting || !newChatName.trim() || !otherHandle.trim()"
+            :disabled="submitting || !newChatName.trim() || !chatParticipants.length"
         >
             Create Chat
         </button>
     </form>
-    <h3>Create Group</h3>
+    <!-- <h3>Create Group</h3>
     <form @submit.prevent="createGroup(newGroupName, otherHandles)">
         <input type="text" v-model="newGroupName" placeholder="Group Name" disabled/>
         <input type="text" v-model="otherHandles" placeholder="Graffiti Handles (use commas)" disabled/>
@@ -42,7 +73,7 @@
         >
             Create Group
         </button>
-    </form>
+    </form> -->
     <h3>Create Folder</h3>
     <form @submit.prevent="createFolder(newFolderName)">
         <input type="text" v-model="newFolderName" placeholder="Folder Name"/>

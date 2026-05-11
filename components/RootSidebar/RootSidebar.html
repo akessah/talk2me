@@ -1,13 +1,58 @@
 <ul id="root-sidebar">
-    <li v-for="obj of allObjects" :key="obj.value.channel">
+    <li v-for="obj of allObjects" :key="obj.value.channel" class="root-sidebar__row">
         <button
             type="button"
+            class="root-sidebar__object-button"
+            :class="{
+                'sidebar-folder-opening': openingChannel === obj.value.channel,
+                'root-sidebar__object-button--dragging': draggingChannel === obj.value.channel,
+                'root-sidebar__object-button--drop-target': dragOverFolderChannel === obj.value.channel,
+                'root-sidebar__object-button--moving': movingObjectChannel === obj.value.channel,
+            }"
+            :draggable="movingObjectChannel !== obj.value.channel"
             @click="openFromRoot(obj)"
-            :class="{ 'sidebar-folder-opening': openingChannel === obj.value.channel }"
+            @mouseenter="maybePrefetchObject(obj)"
+            @focus="maybePrefetchObject(obj)"
+            @pointerdown="maybePrefetchObject(obj)"
+            @dragstart="onDragStart($event, obj)"
+            @dragend="onDragEnd"
+            @dragover="obj.value.type === 'Folder' && onFolderDragOver($event, obj)"
+            @dragleave="obj.value.type === 'Folder' && onFolderDragLeave($event, obj)"
+            @drop="obj.value.type === 'Folder' && onFolderDrop($event, obj)"
         >
-        <img src="./media/folder.svg" alt="" class="folder-object-list__icon" v-if="obj.value.type === 'Folder'">
-        <span v-else class="sidebar-list__avatar" aria-hidden="true">{{ objectInitials(obj) }}</span>
-            {{obj.value.title}}
+            <img
+                src="./media/folder.svg"
+                alt=""
+                class="folder-object-list__icon"
+                v-if="obj.value.type === 'Folder'"
+            >
+            <span
+                v-else
+                class="sidebar-list__avatar"
+                aria-hidden="true"
+            >{{ objectInitials(obj) }}</span>
+            <span class="root-sidebar__title">{{ obj.value.title }}</span>
+            <span
+                v-if="movingObjectChannel === obj.value.channel"
+                class="root-sidebar__moving-overlay"
+                aria-hidden="true"
+            >
+                Moving
+            </span>
         </button>
+        <object-menu
+            :class="{ 'object-menu--drag-disabled': !!draggingChannel || movingObjectChannel === obj.value.channel }"
+            :object-channel="obj.value.channel"
+            :active-channel="openChatChannel"
+            :folders="folders"
+            :folder-updates="folderUpdates"
+            :session="session"
+            :all-objects="menuObjects"
+            :graffiti="graffiti"
+            :folderBack="folderBack"
+            :folderNavStack="folderNavStack"
+            :muted-chat-channels="mutedChatChannels"
+            :muted-folder-channels="mutedFolderChannels"
+        ></object-menu>
     </li>
 </ul>

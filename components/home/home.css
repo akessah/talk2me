@@ -31,11 +31,41 @@
   transform: translateY(8px) scale(0.985);
 }
 
-#sidebar #root-sidebar button,
-#sidebar ul.folder-sidebar-list button {
+#sidebar #root-sidebar .root-sidebar__object-button,
+#sidebar ul.folder-sidebar-list .folder-sidebar__object-button {
   transition: background 0.15s ease, color 0.15s ease, transform 160ms ease-out;
 }
 
 #sidebar .sidebar-folder-opening {
   transform: scale(1.015);
+}
+
+/* Mobile: sidebar and chat panel become two separate screens. */
+@media (max-width: 720px) {
+  #home {
+    flex-direction: row;
+  }
+
+  #home #sidebar {
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
+    border-right: none;
+  }
+
+  #home > .chat-panel {
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* Default: show sidebar, hide chat panel. */
+  #home:not(.home--chat-open) > .chat-panel {
+    display: none;
+  }
+
+  /* When a chat is open: show chat panel, hide sidebar. */
+  #home.home--chat-open #sidebar {
+    display: none;
+  }
 }

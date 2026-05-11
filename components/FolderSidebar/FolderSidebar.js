@@ -1,6 +1,11 @@
-import { toRefs, computed, ref } from "vue";
+import { toRefs, computed, ref, watch, inject } from "vue";
 import ObjectMenu from "../ObjectMenu/ObjectMenu.js";
 import { sidebarObjectInitials } from "../objectInitials.js";
+import {
+  addObjectExclusiveToFolder,
+  currentFolderForObject,
+  isFolderDescendantOf,
+} from "../folderOperations.js";
 
 export default {
   props: {
@@ -16,10 +21,17 @@ export default {
     graffiti: { type: Object, required: true },
     contacts: { type: Array, default: () => [] },
     hiddenChatChannels: { type: Object, default: () => new Set() },
+    mutedChatChannels: { type: Object, default: () => new Set() },
+    mutedFolderChannels: { type: Object, default: () => new Set() },
 
   },
   setup(props, { emit }) {
     const openingChannel = ref("");
+    const draggingChannel = ref("");
+    const dragOverFolderChannel = ref("");
+    const movingObjectChannel = ref("");
+    const movingTargetFolderChannel = ref("");
+    const prefetchChatChannel = inject("prefetchChatChannel", null);
     function titleForChannel(ch) {
         if (!ch) return "";
         const obj = props.allObjects.find((o) => o.value.channel === ch);
@@ -38,41 +50,6 @@ export default {
         }
         return parts.join(" / ");
     });
-
-    function latestFolderUpdatesByPair(updates) {
-        const byPair = new Map();
-        for (const u of updates || []) {
-            const k = `${u.value.obj}\0${u.value.target}`;
-            const cur = byPair.get(k);
-            if (!cur || u.value.published > cur.value.published) {
-                byPair.set(k, u);
-            }
-        }
-        return byPair;
-    }
-    function currentFolderForObject(updates, objectChannel) {
-        const byPair = latestFolderUpdatesByPair(updates);
-        let best = null;
-        for (const u of byPair.values()) {
-            if (u.value.obj !== objectChannel || u.value.activity !== "Add") continue;
-            if (!best || u.value.published > best.value.published) {
-            best = u;
-            }
-        }
-        return best ? best.value.target : null;
-    }
-
-    // const sidebarFolderChannel = computed(() => {
-    //     const ch = props.openChatChannel;
-    //     if (!ch) return null;
-    //     const obj = props.openChat;
-    //     if (!obj?.value) return null;
-    //     if (obj.value.type === "Folder") return ch;
-    //     if (obj.value.type === "Chat" || obj.value.type === "Group") {
-    //       return currentFolderForObject(props.folderUpdates, ch);
-    //     }
-    //     return null;
-    // });
 
     const sidebarFolderObject = computed(() => {
         const fc = props.sidebarFolderChannel;
@@ -119,6 +96,140 @@ export default {
         openObjectFromFolder(obj);
     }
 
+    function maybePrefetchObject(obj) {
+        const type = obj?.value?.type;
+        const channel = obj?.value?.channel ?? "";
+        if (!channel) return;
+        if (type !== "Chat" && type !== "Group") return;
+        if (typeof prefetchChatChannel === "function") {
+            prefetchChatChannel(channel);
+        }
+    }
+
+    function objectForChannel(channel) {
+        if (!channel) return null;
+        const list = Array.isArray(props.allObjects) ? props.allObjects : [];
+        return list.find((obj) => obj?.value?.channel === channel) ?? null;
+    }
+
+    function canDropObjectOnFolder(sourceChannel, targetFolderChannel) {
+        if (!sourceChannel || !targetFolderChannel) return false;
+        if (sourceChannel === targetFolderChannel) return false;
+        const sourceObj = objectForChannel(sourceChannel);
+        const targetObj = objectForChannel(targetFolderChannel);
+        if (!sourceObj?.value || targetObj?.value?.type !== "Folder") return false;
+
+        const updates = Array.isArray(props.folderUpdates) ? props.folderUpdates : [];
+        if (currentFolderForObject(updates, sourceChannel) === targetFolderChannel) {
+            return false;
+        }
+        if (
+            sourceObj.value.type === "Folder" &&
+            isFolderDescendantOf(updates, targetFolderChannel, sourceChannel)
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function onDragStart(event, obj) {
+        const channel = obj?.value?.channel ?? "";
+        if (!channel || !event.dataTransfer) return;
+        draggingChannel.value = channel;
+        dragOverFolderChannel.value = "";
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", channel);
+    }
+
+    function onDragEnd() {
+        draggingChannel.value = "";
+        dragOverFolderChannel.value = "";
+    }
+
+    watch(
+        () => props.folderUpdates,
+        (updates) => {
+            if (!movingObjectChannel.value || !movingTargetFolderChannel.value) return;
+            const current = currentFolderForObject(
+                Array.isArray(updates) ? updates : [],
+                movingObjectChannel.value,
+            );
+            if (current === movingTargetFolderChannel.value) {
+                movingObjectChannel.value = "";
+                movingTargetFolderChannel.value = "";
+            }
+        },
+        { deep: true },
+    );
+
+    function onFolderDragOver(event, targetObj) {
+        const targetFolderChannel = targetObj?.value?.channel ?? "";
+        const sourceChannel =
+            draggingChannel.value || event.dataTransfer?.getData("text/plain") || "";
+        if (!canDropObjectOnFolder(sourceChannel, targetFolderChannel)) {
+            dragOverFolderChannel.value = "";
+            return;
+        }
+        event.preventDefault();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+        dragOverFolderChannel.value = targetFolderChannel;
+    }
+
+    function onFolderDragLeave(event, targetObj) {
+        const targetFolderChannel = targetObj?.value?.channel ?? "";
+        const related = event.relatedTarget;
+        if (
+            related &&
+            event.currentTarget instanceof Element &&
+            event.currentTarget.contains(related)
+        ) {
+            return;
+        }
+        if (dragOverFolderChannel.value === targetFolderChannel) {
+            dragOverFolderChannel.value = "";
+        }
+    }
+
+    async function onFolderDrop(event, targetObj) {
+        const targetFolderChannel = targetObj?.value?.channel ?? "";
+        const sourceChannel =
+            draggingChannel.value || event.dataTransfer?.getData("text/plain") || "";
+        dragOverFolderChannel.value = "";
+        if (!canDropObjectOnFolder(sourceChannel, targetFolderChannel)) {
+            draggingChannel.value = "";
+            return;
+        }
+        event.preventDefault();
+        movingObjectChannel.value = sourceChannel;
+        movingTargetFolderChannel.value = targetFolderChannel;
+        try {
+            await addObjectExclusiveToFolder({
+                graffiti: props.graffiti,
+                session: props.session,
+                objectChannel: sourceChannel,
+                targetFolderChannel,
+                folderUpdates: props.folderUpdates,
+            });
+        } catch (e) {
+            console.error(e);
+            movingObjectChannel.value = "";
+            movingTargetFolderChannel.value = "";
+        } finally {
+            draggingChannel.value = "";
+        }
+    }
+
+    watch(
+        openFolder,
+        (objects) => {
+            for (const obj of (objects || []).slice(0, 6)) {
+                maybePrefetchObject(obj);
+            }
+        },
+        { immediate: true },
+    );
+
     function objectInitials(obj) {
         return sidebarObjectInitials(
             obj,
@@ -130,6 +241,15 @@ export default {
     return {
         openFromFolder,
         openingChannel,
+        draggingChannel,
+        dragOverFolderChannel,
+        movingObjectChannel,
+        maybePrefetchObject,
+        onDragStart,
+        onDragEnd,
+        onFolderDragOver,
+        onFolderDragLeave,
+        onFolderDrop,
         openFolder,
         sidebarListTitle,
         breadcrumbText,

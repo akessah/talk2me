@@ -11,21 +11,106 @@ ul#root-sidebar li {
   margin: 0;
 }
 
-ul#root-sidebar button {
+ul#root-sidebar li.root-sidebar__row {
+  position: relative;
+}
+
+ul#root-sidebar .root-sidebar__object-button {
+  position: relative;
+  min-width: 0;
   width: 100%;
   text-align: left;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 3.6rem 0.75rem 1rem;
   background: var(--surface);
   border: 1px solid var(--border);
   font-weight: 500;
   display: flex;
   align-items: center;
   gap: 0.85rem;
+  cursor: grab;
 }
 
-ul#root-sidebar button:hover {
+ul#root-sidebar .root-sidebar__object-button:hover {
   background: var(--surface-hover);
   border-color: var(--accent);
+}
+
+ul#root-sidebar .root-sidebar__object-button--dragging {
+  opacity: 0.72;
+  cursor: grabbing;
+}
+
+ul#root-sidebar .root-sidebar__object-button--moving {
+  color: var(--text-muted);
+  cursor: progress;
+  filter: grayscale(0.2);
+}
+
+ul#root-sidebar .root-sidebar__object-button--drop-target {
+  background: rgba(91, 141, 239, 0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(91, 141, 239, 0.18);
+}
+
+ul#root-sidebar .root-sidebar__title {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+ul#root-sidebar .root-sidebar__moving-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: rgba(230, 225, 235, 0.82);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+ul#root-sidebar li.root-sidebar__row > .object-menu {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+
+ul#root-sidebar li.root-sidebar__row > .object-menu .object-menu-button {
+  background: transparent;
+}
+
+ul#root-sidebar li.root-sidebar__row > .object-menu.object-menu--drag-disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (min-width: 721px) {
+  ul#root-sidebar li.root-sidebar__row > .object-menu {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease-out;
+  }
+
+  ul#root-sidebar li.root-sidebar__row:hover > .object-menu,
+  ul#root-sidebar li.root-sidebar__row:focus-within > .object-menu {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  ul#root-sidebar li.root-sidebar__row > .object-menu {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 ul#root-sidebar .sidebar-list__avatar {

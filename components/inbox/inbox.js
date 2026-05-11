@@ -1,7 +1,8 @@
-import { computed, inject } from "vue";
+import { computed, inject, watch } from "vue";
 import { useGraffitiDiscover } from "@graffiti-garden/wrapper-vue";
 import { getLastRead } from "../chatReadState.js";
 import { initialsFromLabel } from "../objectInitials.js";
+import { isDirectConversationBetween } from "../conversationUtils.js";
 
 const notificationDiscoverOpts = {
   properties: {
@@ -26,9 +27,12 @@ export default async () => ({
     appName: { type: String, required: true },
     allObjects: { type: Array, default: () => [] },
     contacts: { type: Array, default: () => [] },
+    mutedContactActors: { type: Object, default: () => new Set() },
+    mutedChatChannels: { type: Object, default: () => new Set() },
   },
   setup(props) {
     const openChatAndGoHome = inject("openChatAndGoHome", null);
+    const prefetchChatChannel = inject("prefetchChatChannel", null);
 
     const { objects: notificationsRaw } = useGraffitiDiscover(
       () =>
@@ -85,10 +89,37 @@ export default async () => ({
       if (!actor) return [];
       const raw = notificationsRaw?.value;
       const list = Array.isArray(raw) ? raw : [];
+      const filtered = list.filter((notif) => {
+        const mutedChats = props.mutedChatChannels;
+        const channel = notif?.value?.chatChannel;
+        if (
+          mutedChats &&
+          typeof mutedChats.has === "function" &&
+          channel &&
+          mutedChats.has(channel)
+        ) {
+          return false;
+        }
+        const mutedActors = props.mutedContactActors;
+        if (!mutedActors || typeof mutedActors.has !== "function" || !mutedActors.size) {
+          return true;
+        }
+        if (!channel) return true;
+        const conversation = props.allObjects?.find(
+          (obj) => obj?.value?.channel === channel,
+        );
+        if (!conversation) return true;
+        for (const mutedActor of mutedActors) {
+          if (isDirectConversationBetween(conversation, actor, mutedActor)) {
+            return false;
+          }
+        }
+        return true;
+      });
       // Dedupe: show one row per chatChannel (newest unread notification wins).
       const bestByChat = new Map();
       const unreadCountByChat = new Map();
-      for (const notif of list) {
+      for (const notif of filtered) {
         const v = notif?.value;
         const ch = v?.chatChannel;
         if (!ch) continue;
@@ -123,6 +154,17 @@ export default async () => ({
       rows.sort((a, b) => (b.published ?? 0) - (a.published ?? 0));
       return rows;
     });
+
+    watch(
+      notifications,
+      (rows) => {
+        if (typeof prefetchChatChannel !== "function") return;
+        for (const row of (rows || []).slice(0, 6)) {
+          prefetchChatChannel(row.chatChannel);
+        }
+      },
+      { immediate: true },
+    );
 
     function onOpen(n) {
       if (typeof openChatAndGoHome === "function") {

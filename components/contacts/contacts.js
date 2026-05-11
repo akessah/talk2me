@@ -3,16 +3,30 @@ import { initialsFromLabel } from "../objectInitials.js";
 
 function setup(props) {
 	// const contactHandles = computed(() => new Set(props.contacts.map(c => c.value.handle)))
+    function contactActorId(c) {
+        const v = c?.value;
+        return v?.actorId ?? v?.actor ?? "";
+    }
+
     const curContacts = computed(()=>{
-        return Object.values(
-            props.contacts.reduce((acc, object) => {
-                    const { id, published } = object.value;
-                    if (!acc[id] || acc[id].value.published < published) {
-                    acc[id] = object;
-                }
-                return acc;
-            }, {}),
-        )
+        const latestByContact = new Map();
+        for (const object of props.contacts || []) {
+            const actorId = contactActorId(object);
+            const handle = object?.value?.handle ?? "";
+            const key = actorId || handle;
+            if (!key) continue;
+            const published = object?.value?.published ?? 0;
+            const current = latestByContact.get(key);
+            if (!current || (current?.value?.published ?? 0) < published) {
+                latestByContact.set(key, object);
+            }
+        }
+
+        return Array.from(latestByContact.values()).sort((a, b) => {
+            const aName = (a?.value?.username ?? a?.value?.handle ?? "").toLowerCase();
+            const bName = (b?.value?.username ?? b?.value?.handle ?? "").toLowerCase();
+            return aName.localeCompare(bName);
+        });
     })
 
     const showAddContactForm = ref(false);
@@ -21,6 +35,7 @@ function setup(props) {
     const contactFormError = ref("");
     const contactFormSubmitting = ref(false);
     const handleError = ref(false);
+    const handleErrorMessage = ref("This graffiti handle was not found. Please try again.");
     const shakeHandleInput = ref(false);
 
     const HANDLE_SHAKE_MS = 450;
@@ -38,12 +53,8 @@ function setup(props) {
 
     watch(newContactHandle, () => {
         handleError.value = false;
+        handleErrorMessage.value = "This graffiti handle was not found. Please try again.";
     });
-
-    function contactActorId(c) {
-        const v = c?.value;
-        return v?.actorId ?? v?.actor ?? "";
-    }
 
     function contactInitials(contact) {
         return initialsFromLabel(
@@ -80,6 +91,13 @@ function setup(props) {
             const otherActor = await resolveHandle(handle);
             if (!otherActor) {
                 handleError.value = true;
+                handleErrorMessage.value = "This graffiti handle was not found. Please try again.";
+                triggerHandleShake();
+                return;
+            }
+            if (otherActor === props.session?.actor) {
+                handleError.value = true;
+                handleErrorMessage.value = "You can't add yourself as a contact.";
                 triggerHandleShake();
                 return;
             }
@@ -129,6 +147,7 @@ function setup(props) {
         contactFormError,
         contactFormSubmitting,
         handleError,
+        handleErrorMessage,
         shakeHandleInput,
         clearHandleShakeAnimation,
         createContact,
