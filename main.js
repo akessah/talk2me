@@ -305,9 +305,88 @@ createApp({
             return [...byChannel.values(), ...withoutChannel];
         }
 
+        // The deployed chat discover stream can briefly omit existing chats on a
+        // poll. Keep last-seen chat objects around for a short grace period so
+        // the sidebar doesn't flash chats out and back in on the next poll.
+        const CHAT_DISCOVERY_GRACE_MS = 60000;
+        const stableChatsByChannel = ref(new Map());
+        const stableChatsClock = ref(Date.now());
+        let stableChatsTimer = null;
+
+        function pruneStableChats(now = Date.now()) {
+            const next = new Map();
+            for (const [channel, entry] of stableChatsByChannel.value.entries()) {
+                if (!channel || !entry?.obj) continue;
+                if ((entry.lastSeenAt ?? 0) + CHAT_DISCOVERY_GRACE_MS <= now) continue;
+                next.set(channel, entry);
+            }
+            stableChatsByChannel.value = next;
+        }
+
+        watch(
+            () => session.value?.actor,
+            () => {
+                stableChatsByChannel.value = new Map();
+                stableChatsClock.value = Date.now();
+            },
+            { immediate: true },
+        );
+
+        watch(
+            chats,
+            (list) => {
+                const now = Date.now();
+                stableChatsClock.value = now;
+
+                if (!session.value?.actor) {
+                    stableChatsByChannel.value = new Map();
+                    return;
+                }
+
+                const next = new Map(stableChatsByChannel.value);
+                for (const chat of dedupeObjectsByChannel(list)) {
+                    const channel = chat?.value?.channel ?? "";
+                    if (!channel) continue;
+                    next.set(channel, {
+                        obj: chat,
+                        lastSeenAt: now,
+                    });
+                }
+                stableChatsByChannel.value = next;
+                pruneStableChats(now);
+            },
+            { immediate: true },
+        );
+
+        onMounted(() => {
+            stableChatsTimer = window.setInterval(() => {
+                const now = Date.now();
+                stableChatsClock.value = now;
+                pruneStableChats(now);
+            }, 5000);
+        });
+
+        onBeforeUnmount(() => {
+            if (stableChatsTimer !== null) {
+                window.clearInterval(stableChatsTimer);
+                stableChatsTimer = null;
+            }
+        });
+
+        const stableChats = computed(() => {
+            const now = stableChatsClock.value;
+            const visible = [];
+            for (const entry of stableChatsByChannel.value.values()) {
+                if (!entry?.obj) continue;
+                if ((entry.lastSeenAt ?? 0) + CHAT_DISCOVERY_GRACE_MS <= now) continue;
+                visible.push(entry.obj);
+            }
+            return visible;
+        });
+
         const allObjects = computed(() => {
             const realObjects = dedupeObjectsByChannel([
-                ...chats.value,
+                ...stableChats.value,
                 ...groups.value,
                 ...folders.value,
             ]);
