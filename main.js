@@ -460,6 +460,45 @@ createApp({
           true,
         );
 
+        // Keep a monotonic summary of seen notifications so transient empty or
+        // partial autopoll snapshots do not make chats disappear from the
+        // sidebar and then reappear a moment later.
+        const seenNotificationStats = ref(new Map());
+        watch(
+          () => session.value?.actor,
+          () => {
+            seenNotificationStats.value = new Map();
+          },
+          { immediate: true },
+        );
+        watch(
+          notifications,
+          (list) => {
+            const items = Array.isArray(list) ? list : [];
+            if (!items.length) return;
+            const next = new Map(seenNotificationStats.value);
+            for (const notif of items) {
+              const ch = notif?.value?.chatChannel ?? "";
+              if (!ch) continue;
+              const msgPub = notif?.value?.messagePublished ?? 0;
+              const notifPub = notif?.value?.published ?? 0;
+              const cur = next.get(ch) ?? {
+                maxMessagePublished: 0,
+                maxNotificationPublished: 0,
+              };
+              if (msgPub > cur.maxMessagePublished) {
+                cur.maxMessagePublished = msgPub;
+              }
+              if (notifPub > cur.maxNotificationPublished) {
+                cur.maxNotificationPublished = notifPub;
+              }
+              next.set(ch, cur);
+            }
+            seenNotificationStats.value = next;
+          },
+          { immediate: true },
+        );
+
         const { objects: chatDeletions } = useGraffitiDiscover(
           () =>
             session.value?.actor
@@ -655,21 +694,13 @@ createApp({
         const hiddenChatChannels = computed(() => {
           const hidden = new Set();
           const cuts = chatDeletionCutoffs.value;
-          const notifList = Array.isArray(notifications.value)
-            ? notifications.value
-            : [];
+          const seenStats = seenNotificationStats.value;
 
           // Soft-deletion: hide chats whose deletion cutoff has not been
           // overridden by a later notification.
           for (const [ch, cutoff] of cuts) {
-            let hasNewer = false;
-            for (const n of notifList) {
-              if (n?.value?.chatChannel !== ch) continue;
-              if ((n?.value?.messagePublished ?? 0) > cutoff) {
-                hasNewer = true;
-                break;
-              }
-            }
+            const hasNewer =
+              (seenStats.get(ch)?.maxMessagePublished ?? 0) > cutoff;
             if (!hasNewer) hidden.add(ch);
           }
 
@@ -678,18 +709,13 @@ createApp({
           // for that channel). Folders, and chats created by the current
           // user, are unaffected.
           const sessionActor = session.value?.actor;
-          const chatsWithNotifs = new Set();
-          for (const n of notifList) {
-            const ch = n?.value?.chatChannel;
-            if (ch) chatsWithNotifs.add(ch);
-          }
           for (const obj of allObjects.value) {
             const type = obj?.value?.type;
             if (type !== "Chat" && type !== "Group") continue;
             const ch = obj?.value?.channel;
             if (!ch) continue;
             if (obj.actor && obj.actor === sessionActor) continue;
-            if (chatsWithNotifs.has(ch)) continue;
+            if (seenStats.has(ch)) continue;
             hidden.add(ch);
           }
 
