@@ -281,17 +281,44 @@ createApp({
         provide("finishChatCreation", finishChatCreation);
         provide("pendingChatCreations", pendingChatCreations);
 
+        function dedupeObjectsByChannel(objects) {
+            const list = Array.isArray(objects) ? objects : [];
+            const byChannel = new Map();
+            const withoutChannel = [];
+
+            for (const obj of list) {
+                const channel = obj?.value?.channel ?? "";
+                if (!channel) {
+                    withoutChannel.push(obj);
+                    continue;
+                }
+
+                const current = byChannel.get(channel);
+                const published = obj?.value?.published ?? 0;
+                const currentPublished = current?.value?.published ?? 0;
+
+                if (!current || published >= currentPublished) {
+                    byChannel.set(channel, obj);
+                }
+            }
+
+            return [...byChannel.values(), ...withoutChannel];
+        }
+
         const allObjects = computed(() => {
+            const realObjects = dedupeObjectsByChannel([
+                ...chats.value,
+                ...groups.value,
+                ...folders.value,
+            ]);
             const realChannels = new Set(
-                chats.value.map((c) => c?.value?.channel).filter(Boolean),
+                realObjects.map((obj) => obj?.value?.channel).filter(Boolean),
             );
             const pendingFiltered = pendingChats.value.filter(
                 (p) => !realChannels.has(p?.value?.channel),
             );
             return [
-                ...chats.value,
-                ...groups.value,
-                ...folders.value,
+                ...realObjects,
                 ...pendingFiltered,
             ];
         });
