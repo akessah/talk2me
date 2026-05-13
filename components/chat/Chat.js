@@ -302,8 +302,19 @@ export default {
             ? participantUpdates
             : []),
       ];
+      // `value.participants` is the unmasked, authoritative member list
+      // written by the chat creator. Non-creators see Graffiti's `allowed`
+      // array masked to only contain themselves, so prefer
+      // `value.participants` when available and fall back to `allowed`
+      // (and self) for older chats that don't carry the field yet.
+      const valueParticipants = Array.isArray(
+        props.openChat?.value?.participants,
+      )
+        ? props.openChat.value.participants
+        : [];
       const baseActors = new Set([
         props.openChat?.actor,
+        ...valueParticipants,
         ...(Array.isArray(props.openChat?.allowed) ? props.openChat.allowed : []),
         sessionActor,
       ].filter(Boolean));
@@ -425,20 +436,39 @@ export default {
           return;
         }
 
-        const currentAllowed = Array.isArray(chat.allowed) ? chat.allowed : [];
+        // Base the new allowed list on the *effective* participant list
+        // (chat.actor + chat.value.participants + chat.allowed +
+        // participant Add/Remove records), not just chat.allowed. Graffiti
+        // masks `allowed` to only contain the querying actor for non-
+        // creators, so we can't trust `chat.allowed` to enumerate everyone.
+        const effectiveActors = participants.value.map((p) => p.actor);
         const newAllowed = Array.from(
           new Set(
-            [...currentAllowed, resolved.actor].filter(
+            [...effectiveActors, resolved.actor].filter(
               (actor) => actor && actor !== sessionActor,
             ),
           ),
         );
+        // Full member list for `value.participants` (includes creator,
+        // since the creator is also a participant). This is stored in the
+        // chat's value field so non-creators can read it -- value isn't
+        // masked by Graffiti the way `allowed` is.
+        const newValueParticipants = Array.from(
+          new Set([
+            chat.actor,
+            ...effectiveActors,
+            resolved.actor,
+          ].filter(Boolean)),
+        );
         const isCreator = chat.actor === sessionActor;
+        const repostPublished = Date.now();
 
         // The chat object's `allowed` list gates whether a new participant
         // can discover the chat at all. Only the creator can rewrite it
         // (delete + re-post). Post first then delete so the panel doesn't
-        // flicker out for current participants while we swap.
+        // flicker out for current participants while we swap. Bump
+        // `value.published` so the global dedupe-by-channel logic in
+        // main.js picks the new version over the old one for everyone.
         if (isCreator) {
           const channelsForRepost =
             Array.isArray(chat.channels) && chat.channels.length
@@ -450,7 +480,11 @@ export default {
           try {
             await props.graffiti.post(
               {
-                value: { ...chat.value },
+                value: {
+                  ...chat.value,
+                  published: repostPublished,
+                  participants: newValueParticipants,
+                },
                 allowed: newAllowed,
                 channels: channelsForRepost,
               },
@@ -707,6 +741,10 @@ export default {
         },
       };
       optimisticMessages.value = [...optimisticMessages.value, optimistic];
+      if (newMessage.value === message) {
+        newMessage.value = "";
+        resizeMessageInput();
+      }
 
       userPinnedToBottom.value = true;
       scrollMessagesToBottom();
@@ -732,6 +770,10 @@ export default {
         optimistic.__status = "sent";
       } catch (e) {
         optimistic.__status = "failed";
+        if (!newMessage.value.trim()) {
+          newMessage.value = content;
+          resizeMessageInput();
+        }
         console.error(e);
         return;
       }
@@ -762,8 +804,6 @@ export default {
           console.error(e);
         }
       }
-      newMessage.value = "";
-      resizeMessageInput();
     }
 
     watch(

@@ -170,6 +170,13 @@ export default {
       const recipientActors = Array.from(
         new Set(participantActors.filter((actor) => actor && actor !== sessionActor))
       );
+      // Full member list (creator + recipients) is stored in the chat
+      // object's `value` field so non-creators can read it. Graffiti masks
+      // the `allowed` array for non-creators (they only see themselves),
+      // so we cannot rely on `chat.allowed` to enumerate participants.
+      const valueParticipants = Array.from(
+        new Set([sessionActor, ...recipientActors].filter(Boolean))
+      );
 
       const chatChannel = crypto.randomUUID();
       const t = Date.now();
@@ -188,6 +195,7 @@ export default {
           actor: sessionActor,
           allowed: recipientActors,
           channels: chatChannelsList,
+          participants: valueParticipants,
         });
 
         // 2. Reset form + close the sidebar.
@@ -246,6 +254,7 @@ export default {
                 channel: chatChannel,
                 title: trimmedName,
                 published: t,
+                participants: valueParticipants,
               },
               allowed: recipientActors,
               channels: chatChannelsList,

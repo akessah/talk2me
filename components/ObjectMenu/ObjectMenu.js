@@ -3,6 +3,7 @@ import {
   addObjectExclusiveToFolder,
   currentFolderForObject,
 } from "../folderOperations.js";
+import { setLocalChatDeletionCutoff } from "../chatDeletionState.js";
 import { NOTIFICATION_MUTE_OPTIONS } from "../notificationMuteOptions.js";
 
 
@@ -251,18 +252,20 @@ export default {
     }
 
     async function postChatDeletion(chatChannel) {
+      const published = Date.now();
       await props.graffiti.post(
         {
           value: {
             activity: "DeleteChat",
             chatChannel,
-            published: Date.now(),
+            published,
           },
           allowed: [],
           channels: [`${props.session.actor}/chat-deletions`],
         },
         props.session
       );
+      setLocalChatDeletionCutoff(props.session.actor, chatChannel, published);
     }
 
     async function postFolderRemove(objChannel, targetFolderChannel) {

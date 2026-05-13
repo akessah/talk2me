@@ -19,6 +19,10 @@ import {
   useGraffitiDiscover,
 } from "@graffiti-garden/wrapper-vue";
 import { getLastRead } from "./components/chatReadState.js";
+import {
+  chatDeletionCutoffMap,
+  clearLocalChatDeletionCutoff,
+} from "./components/chatDeletionState.js";
 import { isDirectConversationBetween } from "./components/conversationUtils.js";
 import { folderAncestorRecordsForObject } from "./components/folderOperations.js";
 
@@ -209,7 +213,12 @@ createApp({
         const graffiti = useGraffiti();
         const route = useRoute();
 
-
+        /** Same string as `openChatChannel` / object `value.channel` (hash route param). */
+        function routeChatChannelParam() {
+            const raw = route.params?.chatChannel;
+            if (Array.isArray(raw)) return raw[0] ?? "";
+            return typeof raw === "string" ? raw : "";
+        }
 
         const { objects: contacts } = useGraffitiDiscover(
               () => (session.value ? [`${session.value.actor} contacts`] : []),
@@ -247,16 +256,20 @@ createApp({
 
         function startChatCreation(meta) {
             if (!meta?.channel) return;
+            const optimisticValue = {
+                activity: "Create",
+                type: "Chat",
+                channel: meta.channel,
+                title: meta.title ?? "",
+                published: meta.published ?? Date.now(),
+            };
+            if (Array.isArray(meta.participants)) {
+                optimisticValue.participants = meta.participants;
+            }
             const optimistic = {
                 url: `pending-chat:${meta.channel}`,
                 actor: meta.actor ?? session.value?.actor ?? "",
-                value: {
-                    activity: "Create",
-                    type: "Chat",
-                    channel: meta.channel,
-                    title: meta.title ?? "",
-                    published: meta.published ?? Date.now(),
-                },
+                value: optimisticValue,
                 allowed: Array.isArray(meta.allowed) ? meta.allowed : [],
                 channels: Array.isArray(meta.channels) ? meta.channels : [],
                 __pending: true,
@@ -308,16 +321,21 @@ createApp({
         // The deployed chat discover stream can briefly omit existing chats on a
         // poll. Keep last-seen chat objects around for a short grace period so
         // the sidebar doesn't flash chats out and back in on the next poll.
+        // While a chat URL is open, never drop that channel from the stable list
+        // so a long discovery gap does not clear the sidebar and `openChat`.
         const CHAT_DISCOVERY_GRACE_MS = 60000;
         const stableChatsByChannel = ref(new Map());
         const stableChatsClock = ref(Date.now());
         let stableChatsTimer = null;
 
         function pruneStableChats(now = Date.now()) {
+            const pinned = routeChatChannelParam();
             const next = new Map();
             for (const [channel, entry] of stableChatsByChannel.value.entries()) {
                 if (!channel || !entry?.obj) continue;
-                if ((entry.lastSeenAt ?? 0) + CHAT_DISCOVERY_GRACE_MS <= now) continue;
+                const freshEnough =
+                    (entry.lastSeenAt ?? 0) + CHAT_DISCOVERY_GRACE_MS > now;
+                if (!freshEnough && channel !== pinned) continue;
                 next.set(channel, entry);
             }
             stableChatsByChannel.value = next;
@@ -375,10 +393,13 @@ createApp({
 
         const stableChats = computed(() => {
             const now = stableChatsClock.value;
+            const pinned = routeChatChannelParam();
             const visible = [];
-            for (const entry of stableChatsByChannel.value.values()) {
+            for (const [channel, entry] of stableChatsByChannel.value.entries()) {
                 if (!entry?.obj) continue;
-                if ((entry.lastSeenAt ?? 0) + CHAT_DISCOVERY_GRACE_MS <= now) continue;
+                const freshEnough =
+                    (entry.lastSeenAt ?? 0) + CHAT_DISCOVERY_GRACE_MS > now;
+                if (!freshEnough && channel !== pinned) continue;
                 visible.push(entry.obj);
             }
             return visible;
@@ -494,11 +515,7 @@ createApp({
         //   /<chatChannel> -> that chat is open
         // Components still receive `openChatChannel` as a string prop and emit
         // `changeChatChannel` events; we just route through the router below.
-        const openChatChannel = computed(() => {
-            const raw = route.params?.chatChannel;
-            if (Array.isArray(raw)) return raw[0] ?? "";
-            return typeof raw === "string" ? raw : "";
-        });
+        const openChatChannel = computed(() => routeChatChannelParam());
         const openChat = computed(() =>
             allObjects.value.find(
                 (chat) => chat.value.channel === openChatChannel.value
@@ -516,11 +533,13 @@ createApp({
 
         async function deleteObjects(){
           deleting.value = true
-          for (const obj of allObjects.value){
+          for (const obj of [...chats.value, ...groups.value, ...folders.value, ...folderUpdates.value]){
             try{
               await graffiti.delete(obj, session.value)
             }catch(e){
               console.log(e)
+              console.log(obj.actor)
+              console.log(session.value.actor === obj.actor)
               continue
             }
 
@@ -552,6 +571,38 @@ createApp({
         const lastReadTick = ref(0);
         window.addEventListener("talk2me:lastReadChanged", () => {
           lastReadTick.value++;
+        });
+
+        const localChatDeletionCutoffs = ref(new Map());
+        function refreshLocalChatDeletionCutoffs() {
+          const actor = session.value?.actor ?? "";
+          const next = new Map();
+          const raw = chatDeletionCutoffMap(actor);
+          for (const [channel, ts] of Object.entries(raw)) {
+            const cutoff = Number(ts);
+            if (!channel || !Number.isFinite(cutoff) || cutoff <= 0) continue;
+            next.set(channel, cutoff);
+          }
+          localChatDeletionCutoffs.value = next;
+        }
+        watch(
+          () => session.value?.actor,
+          () => {
+            refreshLocalChatDeletionCutoffs();
+          },
+          { immediate: true },
+        );
+        onMounted(() => {
+          window.addEventListener(
+            "talk2me:chatDeletionChanged",
+            refreshLocalChatDeletionCutoffs,
+          );
+        });
+        onBeforeUnmount(() => {
+          window.removeEventListener(
+            "talk2me:chatDeletionChanged",
+            refreshLocalChatDeletionCutoffs,
+          );
         });
 
         const notificationChannels = computed(() =>
@@ -784,6 +835,9 @@ createApp({
 
         const chatDeletionCutoffs = computed(() => {
           const m = new Map();
+          for (const [channel, cutoff] of localChatDeletionCutoffs.value.entries()) {
+            m.set(channel, cutoff);
+          }
           const list = Array.isArray(chatDeletions.value)
             ? chatDeletions.value
             : [];
@@ -796,6 +850,23 @@ createApp({
           }
           return m;
         });
+
+        watch(
+          [seenNotificationStats, localChatDeletionCutoffs, () => session.value?.actor],
+          ([stats, localCutoffs, actor]) => {
+            if (!actor) return;
+            let changed = false;
+            for (const [channel, cutoff] of localCutoffs.entries()) {
+              if ((stats.get(channel)?.maxMessagePublished ?? 0) <= cutoff) continue;
+              clearLocalChatDeletionCutoff(actor, channel);
+              changed = true;
+            }
+            if (changed) {
+              refreshLocalChatDeletionCutoffs();
+            }
+          },
+          { immediate: true },
+        );
 
         const hiddenChatChannels = computed(() => {
           const hidden = new Set();

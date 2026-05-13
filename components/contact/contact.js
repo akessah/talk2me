@@ -57,10 +57,18 @@ function setup(props, { emit }) {
         );
     }
 
+    function isHiddenChannel(conversation) {
+        const hidden = props.hiddenChatChannels;
+        const channel = conversation?.value?.channel ?? "";
+        if (!channel || !hidden || typeof hidden.has !== "function") return false;
+        return hidden.has(channel);
+    }
+
     const contactChats = computed(() =>
         props.allObjects.filter(
             (o) =>
                 isSharedConversationWithContact(o) &&
+                !isHiddenChannel(o) &&
                 uniqueAllowedActors(o).length === 2,
         ),
     );
@@ -69,6 +77,7 @@ function setup(props, { emit }) {
         props.allObjects.filter(
             (o) =>
                 isSharedConversationWithContact(o) &&
+                !isHiddenChannel(o) &&
                 uniqueAllowedActors(o).length >= 3,
         ),
     );
@@ -295,7 +304,7 @@ function setup(props, { emit }) {
 
 
 export default async () => ({
-  props: ['graffiti', 'session', 'contactId', 'contacts', 'allObjects', 'folders', 'folderNavStack', 'openChatChannel', 'folderUpdates', 'appName', 'mutedContactActors'],
+  props: ['graffiti', 'session', 'contactId', 'contacts', 'allObjects', 'folders', 'folderNavStack', 'openChatChannel', 'folderUpdates', 'appName', 'mutedContactActors', 'hiddenChatChannels'],
   emits: ['changeChatChannel', 'changeNavStack'],
   setup,
   template: await fetch(new URL("./contact.html", import.meta.url)).then((r) =>
